@@ -1,4 +1,4 @@
-# Experiment Plan v6 – Can Existing Generative Models Produce Viable MRI Modality Substitutes for Segmentation?
+# Experiment Plan - Can Existing Generative Models Produce Viable MRI Modality Substitutes for Segmentation?
 
 ---
 
