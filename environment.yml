@@ -1,0 +1,61 @@
+# Missing Modalities Benchmark — Unified Conda Environment Specification
+# Environment Name: missing-modalities
+# Target Platform: Windows 10/11 / Linux (x86_64)
+# Python: 3.10 | PyTorch: 2.1.2 | Torchvision: 0.16.2 | CUDA: 11.8 / 12.1
+#
+# REQUIRED ENVIRONMENT VARIABLES (MUST BE EXPORTED BEFORE RUNNING nnU-Net v2 EVALUATIONS):
+# PowerShell:
+#   $Env:nnUNet_raw = "c:\Users\Zephyrus\Documents\Missing-Modalities-Benchmark\data\raw\nnUNet_raw"
+#   $Env:nnUNet_preprocessed = "c:\Users\Zephyrus\Documents\Missing-Modalities-Benchmark\data\processed\nnUNet_preprocessed"
+#   $Env:nnUNet_results = "c:\Users\Zephyrus\Documents\Missing-Modalities-Benchmark\checkpoints\nnUNet_results"
+# Bash:
+#   export nnUNet_raw="/path/to/Missing-Modalities-Benchmark/data/raw/nnUNet_raw"
+#   export nnUNet_preprocessed="/path/to/Missing-Modalities-Benchmark/data/processed/nnUNet_preprocessed"
+#   export nnUNet_results="/path/to/Missing-Modalities-Benchmark/checkpoints/nnUNet_results"
+#
+# EXCLUDED LEGACY PACKAGES:
+#   - medpy: Strictly excluded due to distutils deprecation and C++ compilation failures on MSVC / Python 3.10+.
+#            Replaced functionally by monai.metrics (DiceMetric, HausdorffDistanceMetric) and src/metrics/segmentation.py.
+#   - acloss: Strictly excluded due to deprecated 2019 PyTorch autograd hooks incompatible with PyTorch 2.x.
+#             Not required by any of the 8 benchmark models.
+
+name: missing-modalities
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip=23.3
+  - pytorch=2.1.2
+  - torchvision=0.16.2
+  - pytorch-cuda=11.8
+  - pip:
+      # Medical Imaging & Core Deep Learning Frameworks
+      - monai>=1.3.0
+      - monai-generative>=0.2.0
+      - nnunetv2>=2.2
+      - dynamic-network-architectures>=0.4.4
+      - batchgenerators>=0.25.1
+      - acvl-utils>=0.2.6
+
+      # NIfTI & Medical Volume I/O
+      - SimpleITK>=2.2.0
+      - nibabel>=3.0.0
+      - h5py>=3.8.0
+
+      # Tensor Operations & Multimodal Attention
+      - einops>=0.7.0
+
+      # Image Processing & Numerical Computation
+      - numpy>=1.24.0
+      - scipy>=1.10.0
+      - scikit-image>=0.19.3
+      - scikit-learn
+      - pandas
+
+      # Logging, Visualization & Utilities
+      - tensorboard
+      - tqdm
+      - pyyaml

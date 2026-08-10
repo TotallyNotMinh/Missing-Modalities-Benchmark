@@ -1,0 +1,48 @@
+# ================================================================
+# nnU-Net v2 — Self-configuring method for biomedical image segmentation
+# Isensee et al., Nature Methods 2021 | arXiv:1904.08128
+# ================================================================
+
+model_name: nnunet
+dimension: 3D
+
+network:
+  spatial_dims: 3
+  in_channels: 4       # NOTE: native_missing requires padding to 4 channels or overriding this to 3
+  out_channels: 4      # background + NCR/NET + ED + ET
+  base_num_features: 32
+  max_num_features: 320
+  num_pool_per_axis: [5, 5, 5]
+
+training:
+  # Paper: SGD with Nesterov momentum (Nature Methods 2021, Methods section)
+  optimizer: sgd
+  nesterov: true
+  # Paper: initial lr = 0.01
+  learning_rate: 1.0e-2
+  # Paper: momentum = 0.99
+  momentum: 0.99
+  # Paper: weight_decay = 3e-5
+  weight_decay: 3.0e-5
+  # Paper: Polynomial LR decay: lr(epoch) = lr_init × (1 - epoch/max_epochs)^0.9
+  lr_scheduler: poly
+  poly_exponent: 0.9
+  # Paper: 1000 epochs, where 1 epoch = 250 mini-batches (total 250,000 iterations)
+  max_epochs: 1000
+  iters_per_epoch: 250
+  # Paper: batch size 2 minimum for 3D full-resolution configurations
+  batch_size: 2
+  amp: true
+  # Paper: Deep supervision enabled during training with auxiliary decoder heads
+  # Loss weights at each resolution: [1, 0.5, 0.25, ...] normalized to sum=1
+  deep_supervision: true
+
+losses:
+  # Paper: L = L_Dice + L_CE (equal weight, unweighted sum)
+  dice_weight: 1.0
+  ce_weight: 1.0
+
+early_stopping:
+  monitor: dice_mean
+  patience: 50
+  mode: max

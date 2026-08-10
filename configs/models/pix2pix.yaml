@@ -1,0 +1,47 @@
+# ================================================================
+# Pix2Pix — Image-to-Image Translation with Conditional Adversarial Networks
+# Isola et al., CVPR 2017 | arXiv:1611.07004
+# ================================================================
+
+model_name: pix2pix
+dimension: 2D
+
+network:
+  in_channels: 3       # 3 available modalities as input
+  out_channels: 1      # 1 missing modality as output
+  num_downs: 8         # U-Net depth (for 256x256 input)
+  ngf: 64              # Generator base filters
+  ndf: 64              # Discriminator base filters
+  norm: instance
+  # Dropout p=0.5 in first 3 decoder layers, at both train AND test time (paper Section 3.3)
+  use_dropout: true
+  dropout_prob: 0.5
+
+training:
+  # Paper: batch size 1 (minibatch SGD, Section 3.3)
+  batch_size: 1
+  optimizer: adam
+  # Paper: lr=0.0002 for first 100 epochs, linear decay to 0 over next 100 (Section 3.3)
+  learning_rate: 2.0e-4
+  beta1: 0.5           # Paper explicitly reports β1=0.5
+  beta2: 0.999
+  weight_decay: 0.0    # Not specified in paper; standard Adam default
+  lr_scheduler: linear_decay
+  decay_after_epoch: 100
+  max_epochs: 200      # 100 fixed LR + 100 linear decay (paper Section 4)
+  # Weight initialization: N(0, 0.02^2) (paper Section 3.3)
+  weight_init_std: 0.02
+  # Discriminator objective divided by 2 to slow down D relative to G (paper Section 3.3)
+  disc_loss_scale: 0.5
+
+losses:
+  # Paper objective: L_cGAN(G,D) + λ * L_L1(G)
+  lambda_l1: 100.0     # λ=100 (paper Section 3.1 and Equation 4)
+  lambda_adv: 1.0
+  # Note: SSIM loss is NOT in the original paper — it was a custom addition.
+  # Removed to match paper exactly.
+
+early_stopping:
+  monitor: ssim
+  patience: 20
+  mode: max

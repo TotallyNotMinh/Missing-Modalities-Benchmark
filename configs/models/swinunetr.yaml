@@ -1,0 +1,47 @@
+# ================================================================
+# SwinUNETR — Swin Transformers for Semantic Segmentation of Brain Tumors in MRI
+# Hatamizadeh et al., MICCAI BrainLes Workshop 2021 | arXiv:2201.01266
+# ================================================================
+
+model_name: swinunetr
+dimension: 3D
+
+network:
+  spatial_dims: 3
+  in_channels: 4
+  out_channels: 4
+  # Paper: patch size 128×128×128 for sub-volume training crops
+  img_size: [128, 128, 128]
+  # Paper: transformer embedding patch size 2×2×2
+  window_size: 7
+  # Paper: feature_size=48 (reported in implementation details)
+  feature_size: 48
+  use_checkpoint: true        # Gradient checkpointing to fit GPU memory
+
+training:
+  # Paper: AdamW optimizer
+  optimizer: adamw
+  # Paper: lr = 8×10^-4 (explicitly reported in paper)
+  learning_rate: 8.0e-4
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 1.0e-5
+  # Paper: Cosine annealing with linear warmup
+  lr_scheduler: cosine_with_warmup
+  # Paper: trained for 800 epochs
+  max_epochs: 800
+  # Paper: batch size 1 per GPU (DGX-1, 8× V100)
+  batch_size: 1
+  amp: true
+  # Paper: sliding window inference with 0.7 overlap
+  sw_overlap: 0.7
+
+losses:
+  # Paper: Voxel-wise soft Dice loss ONLY (no CE)
+  dice_weight: 1.0
+  ce_weight: 0.0
+
+early_stopping:
+  monitor: dice_mean
+  patience: 50
+  mode: max

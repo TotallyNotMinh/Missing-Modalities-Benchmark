@@ -1,0 +1,44 @@
+# ================================================================
+# RFNet — Region-aware Fusion Network for Incomplete Multi-modal Brain Tumor Segmentation
+# Ding et al., ICCV 2021 | arXiv:2108.09804
+# ================================================================
+
+model_name: rfnet
+dimension: 3D
+
+network:
+  in_channels: 4
+  out_channels: 4
+  # Benchmark standardized resolution: 128x128x128 (Paper originally used 80x80x80)
+  patch_size: [128, 128, 128]
+  num_classes: 4
+
+training:
+  # Paper: Adam optimizer
+  optimizer: adam
+  # Paper: initial lr = 2×10^-4
+  learning_rate: 2.0e-4
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 1.0e-5
+  # Paper: Poly LR policy: lr = lr_init × (1 - epoch/max_epoch)^0.9
+  lr_scheduler: poly
+  poly_exponent: 0.9
+  # Paper: 500 epochs (not 300 — corrected from prior estimate)
+  max_epochs: 500
+  batch_size: 2
+  amp: true
+  # Paper: Region fusion module warmup starts at epoch 20
+  fusion_warmup_epoch: 20
+  # Paper: Sliding window inference with 50% overlap
+  sw_overlap: 0.5
+
+losses:
+  # Paper: Region-aware loss = Dice + CE + modality-specific segmentation regularizer
+  dice_weight: 1.0
+  ce_weight: 0.5
+
+early_stopping:
+  monitor: dice_mean
+  patience: 30
+  mode: max

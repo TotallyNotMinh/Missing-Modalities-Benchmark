@@ -1,0 +1,88 @@
+# ================================================================
+# 3D-MedDiffusion — Brain Imaging Generation with Latent Diffusion Models
+# Pinaya et al., MICCAI DGM4H Workshop 2022 | arXiv:2209.07162
+# Two-stage training: Stage 1 = AutoencoderKL, Stage 2 = Latent Diffusion Model
+# ================================================================
+
+model_name: 3d_med_diffusion
+dimension: 3D
+
+# ------------------------------------------------------------------
+# Stage 1: 3D AutoencoderKL (VQ-GAN style)
+# ------------------------------------------------------------------
+vae:
+  in_channels: 3
+  out_channels: 1
+  latent_channels: 4       # Spatial latent compression factor 8×
+  spatial_dims: 3
+  num_channels: [64, 128, 256]
+  attention_levels: [false, false, true]
+  with_encoder_nonlocal_attn: true
+  with_decoder_nonlocal_attn: true
+  use_flash_attention: true
+
+vae_training:
+  # Paper Stage 1: Adam, lr=1e-4, β1=0.9, β2=0.999, weight_decay=0
+  optimizer: adam
+  learning_rate: 1.0e-4
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 0.0
+  lr_scheduler: constant
+  # Paper Stage 1: 100,000 iterations, batch size 4
+  batch_size: 4
+  max_steps: 100000
+  amp: true
+
+vae_losses:
+  # Paper: L_autoencoder = L1 + w_perceptual*L_perceptual + w_adv*L_adv + w_kl*L_KL
+  l1_weight: 1.0
+  perceptual_weight: 1.0
+  adversarial_weight: 0.5          # Discriminator activated at step 50,000
+  kl_weight: 1.0e-6                # KL divergence regularization
+  discriminator_start_step: 50000  # PatchGAN discriminator warm-up
+
+# ------------------------------------------------------------------
+# Stage 2: Latent Diffusion Model (Denoising U-Net)
+# ------------------------------------------------------------------
+diffusion:
+  timesteps: 1000
+  beta_schedule: linear
+  beta_start: 1.0e-4
+  beta_end: 0.02
+  # Paper Stage 2: inference with ~50 DDIM steps (not specified exactly, paper uses DDIM)
+  sampling_steps: 50
+  sampling_method: ddim
+
+ldm_training:
+  # Paper Stage 2: Adam, lr=2e-4, β1=0.9, β2=0.999, weight_decay=0
+  optimizer: adam
+  learning_rate: 2.0e-4
+  beta1: 0.9
+  beta2: 0.999
+  weight_decay: 0.0
+  # Paper Stage 2: Cosine Annealing (no warmup)
+  lr_scheduler: cosine
+  # Paper Stage 2: 500 epochs (~100,000 iters), batch size 16-32
+  batch_size: 16
+  max_epochs: 500
+  amp: true
+  gradient_checkpointing: true
+  # Paper: EMA on model weights, decay=0.9999
+  ema: true
+  ema_decay: 0.9999
+
+ldm_losses:
+  # Paper: MSE on predicted noise (L_simple), unweighted
+  noise_pred_weight: 1.0
+
+training:
+  batch_size: 2
+  max_epochs: 500
+  amp: true
+  gradient_checkpointing: true
+
+early_stopping:
+  monitor: ssim
+  patience: 20
+  mode: max
