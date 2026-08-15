@@ -7,7 +7,7 @@
 
 An empirical benchmark and methodology framework evaluating whether modern **Generative Modality Synthesis** models (Conditional GANs, 3D DDPMs, 3D Latent Diffusion) produce viable substitutes for real MRI sequences in downstream clinical segmentation, compared against **Purpose-Built Missing-Modality Architectures** (AdaMM, mmFormer, RFNet).
 
-For the full theoretical study design and experimental hypothesis matrix, see [`plan.md`](plan.md).
+For the full theoretical study design and experimental hypothesis matrix, see [`PLAN.md`](PLAN.md).
 
 ---
 
