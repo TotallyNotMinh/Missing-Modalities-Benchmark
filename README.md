@@ -127,7 +127,7 @@ Each missing‑modality model is compared **against itself** under two input con
 
 | Model              | Architecture                               | Why included                                                                                                |
 | ------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| **PASSION**  | Transformer, distillation‑based           | Missing‑modality SOTA (2024). Hardest to improve upon — if synthesis helps PASSION, it's a strong result. |
+| **AdaMM**    | Adaptive multi-modal fusion                | SOTA adaptive feature fusion missing-modality baseline.                                                     |
 | **mmFormer** | Multi‑modal transformer, cross‑attention | Transformer missing‑modality baseline.                                                                     |
 | **RFNet**    | CNN, region‑aware fusion                  | CNN missing‑modality baseline.                                                                             |
 
@@ -167,7 +167,7 @@ $$
 
 | Model    | Native missing | + Pix2Pix | + Med-DDPM | + 3D‑MedDiff | Oracle    |
 | -------- | -------------- | --------- | ---------- | ------------- | --------- |
-| PASSION  | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
+| AdaMM    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
 | mmFormer | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
 | RFNet    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
 
@@ -264,7 +264,7 @@ We stratify downstream segmentation errors (Dice drop) by:
 | Outcome                                          | Interpretation                                                                                                                         |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Synthesis helps all three models                 | Generated modality carries information that even purpose‑built architectures cannot recover internally. Strong result.                |
-| Synthesis helps RFNet / mmFormer but not PASSION | PASSION's distillation mechanism already recovers what the generator provides. Synthesis substitutes for architectural sophistication. |
+| Synthesis helps RFNet / mmFormer but not AdaMM   | AdaMM's adaptive fusion mechanism already recovers what the generator provides. Synthesis substitutes for architectural sophistication. |
 | Synthesis hurts all three models                 | Synthetic artefacts interfere with learned missing‑modality representations. Native handling is strictly better.                      |
 | Diffusion helps, GAN hurts                       | There is a generator quality threshold below which synthesis is harmful.                                                               |
 
@@ -305,7 +305,7 @@ We stratify downstream segmentation errors (Dice drop) by:
 
 ### RQ2 — Synthesis vs Native Handling
 
-- [ ] Train PASSION, mmFormer, RFNet on incomplete training data.
+- [ ] Train AdaMM, mmFormer, RFNet on incomplete training data.
 - [ ] Evaluate each in native missing mode (S1–S4).
 - [ ] Evaluate each with Pix2Pix synthetic input (S1–S4).
 - [ ] Evaluate each with Med-DDPM synthetic input (S1–S4).
