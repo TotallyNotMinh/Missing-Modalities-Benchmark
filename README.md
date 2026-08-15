@@ -1,338 +1,296 @@
-# Experiment Plan - Can Existing Generative Models Produce Viable MRI Modality Substitutes for Segmentation?
+# Missing Modalities Benchmark: Synthesis vs. Native Handling in Brain MRI Segmentation
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
+[![MONAI](https://img.shields.io/badge/MONAI-1.3+-blueviolet.svg)](https://monai.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+An empirical benchmark and methodology framework evaluating whether modern **Generative Modality Synthesis** models (Conditional GANs, 3D DDPMs, 3D Latent Diffusion) produce viable substitutes for real MRI sequences in downstream clinical segmentation, compared against **Purpose-Built Missing-Modality Architectures** (AdaMM, mmFormer, RFNet).
+
+For the full theoretical study design and experimental hypothesis matrix, see [`plan.md`](plan.md).
 
 ---
 
-## Background & Motivation
-
-Existing MRI modality synthesis research primarily evaluates image reconstruction quality or introduces new generation methods. There is limited systematic evidence on whether current generators produce synthetic modalities that are suitable substitutes for real MRI sequences in downstream segmentation, particularly across both conventional segmentation models and dedicated missing-modality architectures. Furthermore, the relationship between image fidelity metrics and downstream clinical utility remains poorly understood.
-
-## Study Type
-
-**Empirical comparative and methodological study.** No novel models are proposed. All generators and segmenters are existing published methods. The contributions are:
-
-1. A controlled, within‑model comparative evaluation of the "synthesise then segment" paradigm against purpose‑built missing‑modality architectures.
-2. A methodological evaluation of whether traditional pixel-level reconstruction metrics (PSNR, SSIM) are reliable predictors of downstream clinical task performance (segmentation).
-3. A systematic failure-mode analysis characterizing the physical/biological reasons behind generative model translation failures.
-
-## Research Questions
-
-| #             | Question                                                                                                                                      | How tested                                                                                                                             |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **RQ1** | Do existing generative models produce synthetic modalities that are viable substitutes for real ones in downstream segmentation?              | Freeze a full‑modality segmenter. Compare its performance on (4 real) vs (3 real + 1 synthetic). Small Dice drop = viable substitute. |
-| **RQ2** | Do models with built‑in missing‑modality handling benefit from receiving a synthesised modality instead of using their native compensation? | Same missing‑modality model, compared against itself: native 3‑channel mode vs 3 real + 1 synthetic as full 4‑channel input.        |
-| **RQ3** | Do traditional pixel-level quality metrics (PSNR, SSIM) correlate with and predict downstream segmentation performance (Dice, HD95)?          | Compute Pearson/Spearman correlation coefficients between (PSNR, SSIM) and (Dice, HD95) across all test cases and scenarios.           |
-
-> [!IMPORTANT]
-> **The generators are the subject of evaluation, not a contribution.** Segmentation models serve as measuring instruments — downstream, task‑based quality metrics for the synthetic modality. We are not benchmarking segmenters against each other, nor proposing new generative architectures.
-
-![Experimental Pipeline Flowchart](figures/01-flowchart-experimental-pipeline.jpg)
+## Table of Contents
+- [1. Benchmark Overview](#1-benchmark-overview)
+- [2. Repository Structure](#2-repository-structure)
+- [3. Missing-Modality Scenarios](#3-missing-modality-scenarios)
+- [4. Data Preprocessing Pipeline](#4-data-preprocessing-pipeline)
+- [5. Controlled Augmentation Protocols](#5-controlled-augmentation-protocols)
+  - [5.1 Synthesis Models Augmentation Protocol](#51-synthesis-models-augmentation-protocol-controlled-variable)
+  - [5.2 Downstream Segmentation Augmentation Protocol](#52-downstream-segmentation-augmentation-protocol-nnu-net-standard)
+  - [5.3 Deterministic Validation & Test Policy](#53-deterministic-validation--test-policy)
+- [6. Universal 8-Channel Modality Synthesis Formulation](#6-universal-8-channel-modality-synthesis-formulation)
+- [7. Getting Started & Reproducibility](#7-getting-started--reproducibility)
+  - [7.1 Environment Setup](#71-environment-setup)
+  - [7.2 Deterministic 70/15/15 Data Split](#72-deterministic-701515-data-split)
+  - [7.3 Training Synthesis Models](#73-training-synthesis-models)
+  - [7.4 Downstream Segmentation Evaluation](#74-downstream-segmentation-evaluation)
+- [8. Evaluation Metrics](#8-evaluation-metrics)
 
 ---
 
-## 1 Dataset & Pre‑processing
+## 1. Benchmark Overview
 
-### 1.1 BraTS 2020
+Clinical MRI protocols frequently suffer from missing sequences due to patient motion, scan-time constraints, allergic reactions to gadolinium contrast, or emergency triage. 
 
-| Property         | Detail                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Modalities       | T1, T1ce, T2, FLAIR (all present per patient).                                                                      |
-| Annotations      | Expert‑revised masks for WT, TC, ET.                                                                               |
-| Size             | 369 training cases.                                                                                                 |
-| Why this dataset | Standard benchmark; full‑modality availability enables controlled missingness; official nnU‑Net v2 weights exist. |
+This benchmark evaluates two competing paradigms across 4 standard single-modality-missing scenarios on **BraTS 2020**:
+1. **"Synthesise-then-Segment"**: Use a generator (e.g., 3D Pix2Pix, Med-DDPM, 3D-MedDiffusion) to reconstruct the missing volume, then feed the full 4-channel stack into a frozen oracle segmenter (`nnU-Net v2`, `SwinUNETR`).
+2. **"Native Missing-Modality Handling"**: Feed the available 3 sequences directly into architectures with built-in missingness compensation (`AdaMM`, `mmFormer`, `RFNet`).
+3. **Metric Decoupling Analysis**: Investigate whether pixel-level fidelity metrics (PSNR, SSIM) genuinely correlate with or decouple from downstream clinical task utility (Dice, HD95).
 
-### 1.2 Pre‑processing
-
-| Step                      | Justification                                                        |
-| ------------------------- | -------------------------------------------------------------------- |
-| Skull‑stripping          | Removes non‑brain voxels.                                           |
-| N4 bias‑field correction | Corrects RF‑coil intensity inhomogeneity.                           |
-| Per‑modality z‑score    | Standardises intensity distributions across patients and modalities. |
-
-### 1.3 Split
-
-- **70 / 15 / 15 %** patient‑wise (≈ 259 / 56 / 54).
-- Same split for all experiments.
-
-### 1.4 Missing‑Modality Scenarios
-
-| Scenario | Available       | Synthesised | Clinical motivation                         |
-| -------- | --------------- | ----------- | ------------------------------------------- |
-| S1       | T1, T1ce, T2    | FLAIR       | Most commonly absent in retrospective data. |
-| S2       | T1, T2, FLAIR   | T1ce        | Contrast skipped (allergy, cost).           |
-| S3       | T1ce, T2, FLAIR | T1          | Pre‑contrast T1 occasionally omitted.      |
-| S4       | T1, T1ce, FLAIR | T2          | Emergency protocol.                         |
-
----
-
-## 2 Generators (Evaluated Models)
-
-| Generator                  | Type                  | Why included                                                                                    |
-| -------------------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
-| **Pix2Pix**          | Conditional GAN (2D)  | Paired‑data GAN baseline. Fast, simple. Represents 2D GAN‑based synthesis.                    |
-| **Med‑DDPM**        | DDPM (3D)             | Volumetric diffusion baseline. Represents native 3D diffusion without latent space compression. |
-| **3D‑MedDiffusion** | Latent diffusion (3D) | State‑of‑the‑art 3D latent diffusion. Represents the modern LDM paradigm (fast, low-memory). |
-
-Three generators are evaluated to avoid a simple 1-vs-1 comparison and span across GANs, native 3D diffusion, and latent 3D diffusion. They bracket the quality range. Comparing Pix2Pix (2D GAN) vs Med-DDPM (3D DDPM) vs 3D-MedDiffusion (3D LDM) allows us to analyze the combined impact of dimensionality (2D vs 3D) and generative framework (adversarial vs score-based).
-
-### Training Protocol
-
-- **Supervision**: paired — (available modalities) → (missing modality).
-- **Losses**: adversarial + L1 + SSIM.
-- **Early stopping**: validation PSNR / SSIM, patience = 20 epochs.
-- **Freeze** after training. Generate synthetic modality for all val and test patients under S1–S4.
+```
+                 ┌─────────────────────────────────────────────────────────┐
+                 │       Incomplete 3-Modality Patient MRI Volume          │
+                 │         e.g., S1: [T1, T1ce, T2] (Missing FLAIR)         │
+                 └────────────────────────────┬────────────────────────────┘
+                                              │
+                     ┌────────────────────────┴────────────────────────┐
+                     ▼                                                 ▼
+     ┌───────────────────────────────┐                 ┌───────────────────────────────┐
+     │  Paradigms 1: Modality Synth  │                 │  Paradigm 2: Native Handling  │
+     │  (Pix2Pix, Med-DDPM, LDM)     │                 │  (AdaMM, mmFormer, RFNet)     │
+     └───────────────┬───────────────┘                 └───────────────┬───────────────┘
+                     ▼                                                 │
+     ┌───────────────────────────────┐                                 │
+     │ Synthesized 4-Channel Stack   │                                 │
+     │ [T1, T1ce, T2, FLAIR_syn]     │                                 │
+     └───────────────┬───────────────┘                                 │
+                     ▼                                                 │
+     ┌───────────────────────────────┐                                 │
+     │ Frozen Oracle Segmenter       │                                 │
+     │ (nnU-Net v2 / SwinUNETR)      │                                 │
+     └───────────────┬───────────────┘                                 │
+                     ▼                                                 ▼
+     ┌─────────────────────────────────────────────────────────────────────────────────┐
+     │                     Downstream Tumor Segmentation (WT, TC, ET)                  │
+     │                   Evaluation: Dice, HD95, Volumetric Error, TOST                │
+     └─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 3 Experimental Design
+## 2. Repository Structure
 
-### 3.1 RQ1 — "Can existing generators produce a viable substitute?"
-
-The segmentation model is a **frozen downstream evaluator**. It is not being trained or adapted — it simply processes the input and returns a segmentation. The Dice/HD95 difference between oracle and synthetic input is a **task‑based quality score for the generator**.
-
-#### Evaluators
-
-| Model                 | Architecture                       | Why this evaluator                                                                                                                           |
-| --------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **nnU‑Net v2** | Self‑configuring 3D U‑Net (CNN)  | Gold‑standard medical segmentation. Official BraTS 2020 weights → fully reproducible, no retraining.                                       |
-| **SwinUNETR**   | Swin‑Transformer + U‑Net decoder | Transformer‑based evaluator. If both CNN and Transformer respond similarly to the synthetic modality, the result is architecture‑agnostic. |
-
-> [!NOTE]
-> **Why two evaluators?** If nnU‑Net shows a small Dice drop but SwinUNETR shows a large one (or vice versa), the quality of the synthetic modality is architecture‑dependent — a finding worth reporting. If both agree, the conclusion is robust.
-
-#### Conditions (per evaluator, per scenario)
-
-| Condition           | Input                | Role                                                                        |
-| ------------------- | -------------------- | --------------------------------------------------------------------------- |
-| **Oracle**    | 4 real modalities    | Ground truth performance — the standard the generator is measured against. |
-| **Synthetic** | 3 real + 1 generated | Generator's output under evaluation.                                        |
-
-#### Primary Readout
-
-$$
-\Delta\text{Dice} = \text{Dice}_{\text{oracle}} - \text{Dice}_{\text{synthetic}}
-$$
-
-- **ΔDice ≈ 0** → synthetic modality is a good substitute; it preserves segmentation‑relevant information.
-- **ΔDice large** → synthetic modality loses critical information; the generator is not sufficient.
-
-Same logic applies to ΔHD95.
+```
+Missing-Modalities-Benchmark/
+├── configs/                     # Centralized YAML configuration files
+│   └── default.yaml             # Global paths, patch sizes, seeds, hyperparameters
+├── data/
+│   ├── raw/                     # Raw BraTS 2020 data (MICCAI_BraTS2020_TrainingData)
+│   ├── processed/               # Standardized preprocessed volumes (train/val/test)
+│   └── splits/
+│       └── splits.json          # Frozen deterministic 70/15/15 patient split
+├── figures/                     # Methodological diagrams and benchmark charts
+├── plan.md                      # Complete study plan, research questions & hypotheses
+├── src/
+│   ├── data/
+│   │   ├── __init__.py          # Data module exports
+│   │   ├── brats_dataset.py     # Volumetric BraTS NIfTI dataset loader
+│   │   ├── augmentation.py      # Dual-policy augmentation protocols (Synthesis & Segmentation)
+│   │   ├── dataloader.py        # PyTorch DataLoaders with scenario builders
+│   │   ├── scenarios.py         # Missing-modality scenario masks (S1, S2, S3, S4)
+│   │   └── splits.py            # Deterministic split manager and symlinker
+│   ├── metrics/
+│   │   ├── __init__.py          # Metrics exports
+│   │   ├── segmentation.py      # Multi-class Dice and Hausdorff Distance 95 (HD95)
+│   │   └── synthesis.py         # 3D PSNR and 3D Structural Similarity Index (SSIM)
+│   ├── models/                  # Evaluator and missing-modality wrappers
+│   ├── utils/                   # General utility functions and logging
+│   └── visualization/           # Slice plotting and metric correlation visualizers
+├── requirements.txt             # Python dependency requirements
+└── README.md                    # Project documentation
+```
 
 ---
 
-### 3.2 RQ2 — "Does synthesis improve missing‑modality models?"
+## 3. Missing-Modality Scenarios
 
-Each missing‑modality model is compared **against itself** under two input conditions.
+All experiments are evaluated across the 4 canonical single-missing-modality scenarios:
 
-#### Models
-
-| Model              | Architecture                               | Why included                                                                                                |
-| ------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| **AdaMM**    | Adaptive multi-modal fusion                | SOTA adaptive feature fusion missing-modality baseline.                                                     |
-| **mmFormer** | Multi‑modal transformer, cross‑attention | Transformer missing‑modality baseline.                                                                     |
-| **RFNet**    | CNN, region‑aware fusion                  | CNN missing‑modality baseline.                                                                             |
-
-#### Conditions (per model, per scenario)
-
-| Condition                | Input                                                   | Role                                                             |
-| ------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Native missing** | 3 real channels + missing‑modality flag                | Model's own baseline — its designed behaviour.                  |
-| **+ Pix2Pix**      | 3 real + 1 Pix2Pix synthetic (full 4‑ch mode)          | Does GAN synthesis beat the model's internal compensation?       |
-| **+ 3D‑MedDiff**  | 3 real + 1 3D‑MedDiffusion synthetic (full 4‑ch mode) | Does diffusion synthesis beat the model's internal compensation? |
-| **Oracle**         | 4 real channels                                         | Ceiling — how much room exists above native missing?            |
-
-#### Primary Readout
-
-$$
-\Delta\text{Dice} = \text{Dice}_{\text{synthetic}} - \text{Dice}_{\text{native missing}}
-$$
-
-- **ΔDice > 0** → synthesis helps; the generated modality carries information the model's internal mechanism cannot recover.
-- **ΔDice ≈ 0** → the model's built‑in compensation is already sufficient; synthesis adds nothing.
-- **ΔDice < 0** → synthetic artefacts actively interfere with the model's learned representations. Native handling is safer.
+| Scenario | Input Available Modalities | Target Missing Modality | Clinical / Acquisition Context |
+| :--- | :--- | :--- | :--- |
+| **$S_1$** | `[T1, T1ce, T2]` | **`FLAIR`** | Most frequently missing in retrospective archives. |
+| **$S_2$** | `[T1, T2, FLAIR]` | **`T1ce`** | Contrast omitted due to renal impairment, pregnancy, or cost. |
+| **$S_3$** | `[T1ce, T2, FLAIR]` | **`T1`** | Pre-contrast T1 occasionally skipped during rapid protocols. |
+| **$S_4$** | `[T1, T1ce, FLAIR]` | **`T2`** | Emergency/stroke triage protocol variations. |
 
 ---
 
-### 3.3 Full Condition Matrix
+## 4. Data Preprocessing Pipeline
 
-#### RQ1 — Substitute quality (evaluator models)
+To eliminate data processing discrepancies as a confound, all MRI volumes pass through a standardized pipeline:
 
-| Evaluator   | Oracle    | + Pix2Pix | + Med-DDPM | + 3D‑MedDiff |
-| ----------- | --------- | --------- | ---------- | ------------- |
-| nnU‑Net v2 | ✅ S1–S4 | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     |
-| SwinUNETR   | ✅ S1–S4 | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     |
-
-**2 evaluators × 4 conditions × 4 scenarios = 32 cells**
-
-#### RQ2 — Synthesis vs native handling
-
-| Model    | Native missing | + Pix2Pix | + Med-DDPM | + 3D‑MedDiff | Oracle    |
-| -------- | -------------- | --------- | ---------- | ------------- | --------- |
-| AdaMM    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
-| mmFormer | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
-| RFNet    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
-
-**3 models × 5 conditions × 4 scenarios = 60 cells**
-
-**Total: 92 evaluation cells** on ~54 test patients.
-
-![RQ1 vs RQ2 Experimental Setup Comparison](figures/02-comparison-rq1-rq2.jpg)
+1. **Anatomical Reorientation (`IPL`)**:
+   * Reorients all incoming NIfTI scans to standard **Inferior-Posterior-Left (IPL)** space using `nibabel.orientations.ornt_transform`.
+2. **Whole-Brain Bounding Box Extraction**:
+   * Raw BraTS scans contain $>60\%$ empty black air background (`240 × 240 × 155`).
+   * Volumes are cropped to the skull/brain bounding box (`144 × 192 × 192`), saving $>50\%$ VRAM without losing any brain tissue.
+3. **Voxel Intensity Normalization**:
+   * Scaled per-modality to $[0.0, 1.0]$ via min-max normalization:
+     $$X_{\text{norm}} = \frac{X - X_{\min}}{X_{\max} - X_{\min}}$$
+4. **Power-of-2 Symmetric Padding (`PadIfNecessary(5)`)**:
+   * Padded to $160 \times 192 \times 192$ (multiples of $2^5 = 32$) to ensure clean recursive downsamplings without skip-connection shape mismatches.
+5. **Zero-Distortion Test Reconstruction**:
+   * When saving synthesized modalities, volumes are un-padded back to native **$240 \times 240 \times 155$** matrices. Downstream segmentation models load the real and synthesized scans in identical native spatial coordinates.
 
 ---
 
-## 4 Metrics
+## 5. Controlled Augmentation Protocols
 
-### 4.1 Generator Quality — Pixel‑Level
+We implement a **dual-policy augmentation framework** in [`src/data/augmentation.py`](src/data/augmentation.py) to preserve scientific fairness:
 
-| Metric         | What it measures                                          | Role                                                                  |
-| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| **PSNR** | Pixel‑wise reconstruction fidelity.                      | Sanity check. High PSNR = intensities are close to real.              |
-| **SSIM** | Structural similarity (luminance + contrast + structure). | Perceptual quality. Correlates better with human judgement than PSNR. |
+### 5.1 Synthesis Models Augmentation Protocol (Controlled Variable)
+Applied identically across all generative synthesis models (`Pix2Pix`, `Med-DDPM`, `3D-MedDiffusion`). Spatial transforms are sampled once per volume and applied jointly across all 4 sequences to preserve physical tissue alignment.
 
-### 4.2 Generator Quality — Task‑Level (Primary)
+| Transform | Parameters | Probability | Rationale / Exclusions |
+| :--- | :--- | :--- | :--- |
+| **Sagittal Flip** | Left-Right axis ($x$) | $p = 0.50$ | Preserves physiological brain symmetry. |
+| **In-Plane Axial Rotation** | $\pm 10^\circ$ on axial plane ($z$) | $p = 0.50$ | Conservative rotation without non-axial distortion. |
+| **Contrast / Brightness Jitter** | Multiplier scale $\in [0.9, 1.1]$ | $p = 0.30$ | Subtle per-modality variation; prevents artificial drift. |
+| **Gaussian Noise** | Additive $\sigma = 0.02$ on $[0, 1]$ | $p = 0.20$ | Simulates minor RF-coil noise. |
+| **Train Patch Sampling** | $128 \times 128 \times 128$ | $1.00$ | Fixed spatial sub-volume crop during training. |
+| **Elastic Deformation** | *Explicitly Excluded* | $p = 0.00$ | Avoids non-anatomical cross-modal warping. |
+| **Multi-Axis Flipping** | *Explicitly Excluded* | $p = 0.00$ | Excludes non-sagittal A-P and S-I flips. |
 
-| Metric                      | What it measures                                                   | Role                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Dice (WT, TC, ET)** | Volumetric overlap when downstream segmenter uses synthetic input. | **The metric that matters.** Directly measures whether the synthetic modality preserves the features a segmenter needs. |
-| **HD95 (WT, TC, ET)** | Boundary accuracy under synthetic input.                           | Complements Dice — catches boundary degradation that Dice may miss.                                                          |
+### 5.2 Downstream Segmentation Augmentation Protocol (nnU-Net Standard)
+Applied to downstream segmentation networks (`nnUNet`, `SwinUNETR`, `MMFormer`, `RFNet`) to maintain **Oracle consistency** with established pretraining regimes.
 
-> [!TIP]
-> **The relationship between pixel‑level and task‑level metrics is itself a finding.** If PSNR/SSIM are high but Dice drops significantly, the generator is reconstructing the wrong features — it's pixel‑accurate but not task‑relevant. If PSNR/SSIM are mediocre but Dice holds, the generator preserves the features that matter despite cosmetic imperfections.
+| Transform | Parameters | Probability |
+| :--- | :--- | :--- |
+| **3D Random Rotation** | $\pm 30^\circ$ independently per axis ($x, y, z$) | $p = 0.20$ |
+| **Random 3D Scaling** | Zoom factor $\in [0.7, 1.4]$ | $p = 0.20$ |
+| **3D Elastic Deformation** | nnU-Net-derived displacement ($\sigma \in [5, 8]$, mag $\in [50, 150]$) | $p = 0.15$ |
+| **3-Axis Spatial Mirroring** | Random flip along $x, y, z$ axes | $p = 0.50$ per axis |
+| **Additive Gaussian Noise** | Zero-mean Gaussian with $\sigma = 0.10$ | $p = 0.20$ |
+| **3D Gaussian Blur** | Kernel smoothing with $\sigma \in [0.5, 1.0]$ | $p = 0.20$ |
+| **Brightness Scaling** | Multiplier $\in [0.75, 1.25]$ | $p = 0.15$ |
+| **Contrast Jitter** | Exponential scaling $\gamma \in [0.75, 1.25]$ | $p = 0.15$ |
+| **Gamma Inversion** | $\gamma \in [0.7, 1.5]$ with intensity inversion | $p = 0.10$ |
+| **Gamma (Standard)** | $\gamma \in [0.7, 1.5]$ without inversion | $p = 0.30$ |
+| **Simulated Low Resolution** | Nearest-neighbor downsampling scale $\in [0.5, 1.0]$ | $p = 0.20$ |
+| **Train Patch Sampling** | $128 \times 128 \times 128$ | $1.00$ |
 
-### 4.3 Methodological Analysis (RQ3): Metric Decoupling
-
-We analyze whether traditional image-quality metrics (PSNR, SSIM) are reliable predictors of downstream clinical utility.
-
-| Method                                   | Objective                                                                                                                  | Rationale                                                                                                                                                                                                                                                                           |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Joint Metric Correlation**       | Compute Spearman's$\rho$ and Pearson's $r$ between per-patient image metrics (PSNR/SSIM) and task metrics (Dice/HD95). | Tests the hypothesis that structural synthesis fidelity correlates with segmentation task performance.                                                                                                                                                                              |
-| **Outlier & Discordance Analysis** | Identify cases where:1. PSNR/SSIM is high but downstream Dice is low.2. PSNR/SSIM is low but downstream Dice is high.      | Pinpoints*why* traditional voxel-wise metrics fail. For example, a generator might perfectly reconstruct normal brain tissues (high PSNR) but erase/deform the tumor (low Dice), or it might introduce background noise (low PSNR) while preserving tumor boundaries (high Dice). |
-
-![Metric Decoupling Framework Matrix](figures/03-framework-metric-decoupling.jpg)
-
-### 4.4 Systematic Failure-Mode Analysis
-
-Instead of simply reporting that a generator fails, we categorize *how* and *why* generators fail on specific modalities or patient classes:
-
-| Failure Mode                                     | Definition / Metric                                           | Physical / Biological Cause                                                                                                                                        |
-| ------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Lesion Erasure / Hallucination**         | Change in detected tumor volume (prediction vs ground truth). | Generator maps pathology to normal tissue distribution (erasure) or maps normal variance to pathology (hallucination) due to mode collapse or over-regularization. |
-| **Boundary Blurring / de-differentiation** | High HD95 despite reasonable Dice.                            | Loss of high-frequency details (common in GANs and 2D methods), leading to poor contrast at tumor boundaries (e.g., T1ce enhancing border).                        |
-| **Contrast Inversion / Domain Shift**      | Extreme intensity deviation from real target sequence.        | Inability of 2D slice-wise methods to normalize intensity across the full 3D volume, or failure to capture complex scanner-specific bias fields.                   |
-| **Spatial / Structural Warping**           | Distortions in ventricular shape or midline shifts.           | Generator alters anatomy due to weak structural constraints (e.g., excessive deformation in latent space).                                                         |
-
-#### Stratification
-
-We stratify downstream segmentation errors (Dice drop) by:
-
-1. **Tumor Size**: Small (<5 cc) vs Medium (5-50 cc) vs Large (>50 cc). Hypothesized that generators struggle to synthesize small local lesions.
-2. **Tumor Composition**: Dominantly necrotic/cystic vs active enhancing vs edematous tumor (WT, TC, ET subregions). This highlights scenario-specific limits (e.g., synthesizing T1ce enhancing core S2 vs FLAIR edema S1).
-
-> [!WARNING]
-> If a generator shows high average PSNR/SSIM but fails catastrophically (lesion erasure) on small tumors, it is clinically unsafe. Identifying these failure thresholds is the core methodological contribution of the paper.
+### 5.3 Deterministic Validation & Test Policy
+* **Zero stochastic augmentations** applied during validation or testing.
+* Evaluates strictly on deterministic **$128 \times 128 \times 128$ center crops** (or full-volume sliding-window inference), ensuring exact metric reproducibility across all runs.
 
 ---
 
-## 5 Statistical Testing
+## 6. Universal 8-Channel Modality Synthesis Formulation
 
-| Step                        | Method                                                         | Justification                                                                                                                                                                                                                                                                                             |
-| --------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Normality check             | Shapiro‑Wilk on per‑patient ΔDice/ΔHD95                    | Medical imaging metrics often violate normality.                                                                                                                                                                                                                                                          |
-| Paired test                 | Wilcoxon signed‑rank (non‑normal) or paired t‑test (normal) | Same patients under two conditions for the same model. Maximally controlled pairing.                                                                                                                                                                                                                      |
-| Multiple comparisons        | Bonferroni                                                     | Controls error rate across sub‑regions × scenarios × generators.                                                                                                                                                                                                                                       |
-| Effect size                 | Cohen's d or rank‑biserial r                                  | Quantifies practical significance. A statistically significant 0.3 % Dice drop is not clinically meaningful; effect size makes this clear.                                                                                                                                                                |
-| Equivalence test (optional) | TOST (Two One‑Sided Tests)                                    | For RQ1, the goal is to show the synthetic condition is**not worse** than oracle, not that it's better. A standard test can fail to reject H₀ (no difference) without proving equivalence. TOST directly tests whether ΔDice falls within a pre‑specified equivalence margin (e.g., ±1 % Dice). |
+Rather than training 4 separate generator models for each missing modality scenario, we implement the **Universal 8-Channel Conditional Formulation**:
 
-> [!IMPORTANT]
-> **Why consider TOST for RQ1.** Standard null‑hypothesis testing asks "is there a difference?" But RQ1 is "is the synthetic modality a viable substitute" — that's an equivalence question. Failing to find a significant difference (p > 0.05) does not prove equivalence; it may just mean insufficient power. TOST with a clinically meaningful margin (e.g., ΔDice < 1 %) is the correct test for this question.
+$$\mathbf{A} = \big[\, \mathbf{X}_{\text{img}} \;\Vert\; \mathbf{M}_{\text{ind}} \,\big] \in \mathbb{R}^{B \times 8 \times D \times H \times W}$$
 
----
+* **Channels $0\text{--}3$ ($\mathbf{X}_{\text{img}}$)**: The 4 canonical image slots `[T1, T1ce, T2, FLAIR]`. The missing target modality channel $k$ is masked to **zeros**.
+* **Channels $4\text{--}7$ ($\mathbf{M}_{\text{ind}}$)**: 4 binary indicator channels ($1.0 = \text{present}, 0.0 = \text{missing}$).
+* **Target $\mathbf{B}$**: Single-channel tensor $\mathbb{R}^{B \times 1 \times D \times H \times W}$ containing the genuine ground-truth missing sequence.
 
-## 6 Possible Outcomes & Interpretations
-
-### RQ1 (Substitute Quality)
-
-| Outcome                                                           | Interpretation                                                                                                 |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| ΔDice < 1 % for 3D‑MedDiff, both evaluators                     | Excellent substitute. Diffusion‑synthesised modality preserves nearly all segmentation‑relevant information. |
-| ΔDice < 1 % for 3D‑MedDiff but > 3 % for Pix2Pix                | Generator quality is decisive. GAN synthesis is insufficient; diffusion is necessary.                          |
-| ΔDice > 3 % for both generators                                  | Current generators are not good enough. The gap is too large to call synthesis a viable substitute.            |
-| ΔDice varies by scenario (e.g., small for FLAIR, large for T1ce) | Some modalities are harder to synthesise than others. Claim holds conditionally.                               |
-| nnU‑Net and SwinUNETR show different ΔDice patterns             | Synthetic quality is architecture‑dependent — the claim needs qualification.                                 |
-
-### RQ2 (Synthesis vs Native Handling)
-
-| Outcome                                          | Interpretation                                                                                                                         |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Synthesis helps all three models                 | Generated modality carries information that even purpose‑built architectures cannot recover internally. Strong result.                |
-| Synthesis helps RFNet / mmFormer but not AdaMM   | AdaMM's adaptive fusion mechanism already recovers what the generator provides. Synthesis substitutes for architectural sophistication. |
-| Synthesis hurts all three models                 | Synthetic artefacts interfere with learned missing‑modality representations. Native handling is strictly better.                      |
-| Diffusion helps, GAN hurts                       | There is a generator quality threshold below which synthesis is harmful.                                                               |
+```
+Input Tensor A: [ T1, T1ce, T2, FLAIR | M_T1, M_T1ce, M_T2, M_FLAIR ]
+For Scenario S1 (FLAIR Missing):
+  Image Channels     : [ T1_vol, T1ce_vol, T2_vol,    0.0    ]
+  Indicator Channels : [   1.0 ,    1.0  ,   1.0 ,    0.0    ]
+  Target Output B    : [            FLAIR_vol                ]
+```
 
 ---
 
-## 7 Stated Limitations
+## 7. Getting Started & Reproducibility
 
-1. **Three generators only.** Represents GANs and Diffusion but excludes newer models (e.g., Flow Matching).
-2. **No 3D GAN.** Cannot fully disentangle dimensionality from paradigm.
-3. **Single dataset (BraTS 2020).** May not generalise to other datasets.
-4. **Simulated missingness.** Real‑world missing data may differ.
-5. **Single‑modality‑missing only.** Two‑missing scenarios deferred.
+### 7.1 Environment Setup
+```bash
+git clone https://github.com/TotallyNotMinh/Missing-Modalities-Benchmark.git
+cd Missing-Modalities-Benchmark
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 7.2 Deterministic 70/15/15 Data Split
+Generate the frozen, reproducible patient split (Seed 42):
+```python
+from src.data.splits import SplitManager
+
+manager = SplitManager(
+    raw_dir="data/raw/MICCAI_BraTS2020_TrainingData",
+    splits_file="data/splits/splits.json",
+    seed=42
+)
+manager.create_splits(train_ratio=0.70, val_ratio=0.15, test_ratio=0.15)
+manager.setup_split_directories(processed_dir="data/processed")
+```
+
+### 7.3 Training Synthesis Models
+To train the Universal 3D Pix2Pix model on Dual NVIDIA T4 GPUs:
+```bash
+python train.py \
+  --dataroot data/processed \
+  --dataset_name train \
+  --val_dataset_name val \
+  --name universal_pix2pix_3d \
+  --model pix2pix \
+  --dataset_mode brain_3D_random_mod \
+  --B_modality random \
+  --input_nc 8 \
+  --output_nc 1 \
+  --netG unet_3d \
+  --netD basic \
+  --ngf 32 \
+  --ndf 32 \
+  --batch_size 2 \
+  --gpu_ids 0,1 \
+  --amp \
+  --n_epochs 50 \
+  --n_epochs_decay 70 \
+  --lr 0.0002 \
+  --lambda_L1 100.0 \
+  --lambda_perceptual 0.0 \
+  --save_epoch_freq 10
+```
+
+### 7.4 Downstream Segmentation Evaluation
+Synthesize missing sequences on the test split for Scenario $S_1$ (FLAIR):
+```bash
+python test.py \
+  --dataroot data/processed \
+  --test_dataset_name test \
+  --name universal_pix2pix_3d \
+  --model pix2pix \
+  --dataset_mode brain_3D_random_mod \
+  --B_modality flair \
+  --input_nc 8 \
+  --output_nc 1 \
+  --netG unet_3d \
+  --ngf 32 \
+  --batch_size 1 \
+  --gpu_ids 0 \
+  --epoch latest \
+  --results_dir results/S1_flair_synthetic
+```
 
 ---
 
-## 8 Checklist
+## 8. Evaluation Metrics
 
-### Data
+### 8.1 Voxel-Level Synthesis Fidelity
+* **Peak Signal-to-Noise Ratio (PSNR)**: Measures voxel-level mean squared error across the brain mask.
+* **3D Structural Similarity Index (SSIM)**: Evaluates structural, luminance, and contrast degradation.
 
-- [ ] Freeze train/val/test split.
-- [ ] Pre‑process all BraTS 2020 volumes.
+### 8.2 Task-Level Clinical Utility (Primary)
+* **Dice Similarity Coefficient (DSC)**: Evaluated across standard BraTS subregions:
+  * **Whole Tumor (WT)**: Edema + Enhancing + Necrotic Core
+  * **Tumor Core (TC)**: Enhancing + Necrotic Core
+  * **Enhancing Tumor (ET)**: Active Gadolinium-enhancing rim
+* **95th Percentile Hausdorff Distance (HD95)**: Quantifies boundary surface distance in millimeters.
 
-### Generators
+---
 
-- [ ] Train Pix2Pix (S1–S4).
-- [ ] Train Med-DDPM (S1–S4).
-- [ ] Train 3D‑MedDiffusion (S1–S4).
-- [ ] Generate synthetic modalities for val & test sets.
-- [ ] Compute PSNR / SSIM for all generated volumes.
+## License
 
-### RQ1 — Substitute Quality
-
-- [ ] Run nnU‑Net v2 on oracle inputs (S1–S4).
-- [ ] Run nnU‑Net v2 on synthetic inputs (3 generators × S1–S4).
-- [ ] Run SwinUNETR on oracle inputs (S1–S4).
-- [ ] Run SwinUNETR on synthetic inputs (3 generators × S1–S4).
-- [ ] Compute Dice / HD95 for all 32 cells.
-
-### RQ2 — Synthesis vs Native Handling
-
-- [ ] Train AdaMM, mmFormer, RFNet on incomplete training data.
-- [ ] Evaluate each in native missing mode (S1–S4).
-- [ ] Evaluate each with Pix2Pix synthetic input (S1–S4).
-- [ ] Evaluate each with Med-DDPM synthetic input (S1–S4).
-- [ ] Evaluate each with 3D‑MedDiffusion synthetic input (S1–S4).
-- [ ] Evaluate each on oracle (S1–S4).
-- [ ] Failure gallery (3–5 qualitative cases).
-- [ ] Statistical tests (Shapiro‑Wilk → Wilcoxon/t‑test → Bonferroni → effect sizes).
-- [ ] TOST equivalence test for Claim 1 (optional but recommended).
-
-## 9 Reporting
-
-### Tables
-
-- **Table 1**: RQ1 results — Dice (mean ± SD) per evaluator × generator × scenario. ΔDice from oracle highlighted.
-- **Table 2**: RQ1 results — HD95, same layout.
-- **Table 3**: RQ2 results — Dice per missing‑modality model × condition × scenario.
-- **Table 4**: Generation quality — PSNR / SSIM per generator × scenario.
-- **Table 5**: Statistical summary — p‑values, effect sizes, TOST results for key comparisons.
-
-### Figures
-
-- **Fig 1**: RQ1 results — paired bar chart (oracle vs synthetic) per evaluator, faceted by scenario and generator.
-- **Fig 2**: RQ2 results — grouped bars per missing‑modality model comparing native handling against each synthetic augmentation treatment.
-- **Fig 3**: RQ3 results — Joint scatter plots of SSIM/PSNR vs. $\Delta$Dice across test cases, showing regression lines and Spearman correlation ($\rho$).
-- **Fig 4**: Failure Analysis — Stratified bar charts of Dice drops grouped by tumor size classes and tumor composition/subregions.
-- **Fig 5**: Qualitative Failure Casebook — example slices annotated with specific failure types: (a) Lesion erasure, (b) Boundary blurring, (c) Spatial warping, (d) Contrast inversion.
-
-### Conclusion Template
-
-> *"Using [nnU‑Net v2 / SwinUNETR] as a downstream evaluator, [3D‑MedDiffusion / Med-DDPM / Pix2Pix]‑synthesised [modality] achieved a downstream Dice within [X.X ± Y.Y %] of the real‑modality oracle (p = Z.ZZ, equivalence confirmed/not confirmed within a ±1 % margin). Notably, correlation analysis revealed that voxel-wise reconstruction metrics (PSNR, SSIM) [correlated strongly / decoupled] with downstream performance (Spearman's $\rho$ = W.WW), suggesting that pixel-level fidelity [is / is not] a reliable proxy for clinical task utility. Systematic failure analysis highlighted that translation models primarily failed due to [lesion erasure in small tumors / boundary blurring / contrast domain shifts]."*
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
