@@ -1,6 +1,6 @@
 import csv
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -82,7 +82,7 @@ class ExperimentLogger:
             "model": self.model_name,
             "scenario": self.scenario,
             "phase": phase,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         for col in self.COLUMNS:
             if col not in row:

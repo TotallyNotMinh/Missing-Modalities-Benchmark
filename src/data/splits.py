@@ -74,8 +74,8 @@ class SplitManager:
         rng.shuffle(patients)
 
         n = len(patients)
-        n_train = int(n * self.train_ratio)
-        n_val = int(n * self.val_ratio)
+        n_train = int(round(n * self.train_ratio))
+        n_val = int(round(n * self.val_ratio))
 
         splits = {
             "train": patients[:n_train],

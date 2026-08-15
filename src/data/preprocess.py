@@ -21,7 +21,7 @@ import numpy as np
 import SimpleITK as sitk
 from tqdm import tqdm
 
-MODALITY_SUFFIXES = ["t1", "t1ce", "t2", "flair"]
+from .scenarios import MODALITY_SUFFIXES
 SEG_SUFFIX = "seg"
 TARGET_SPACING = (1.0, 1.0, 1.0)  # mm³ isotropic
 

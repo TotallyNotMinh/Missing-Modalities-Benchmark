@@ -126,7 +126,9 @@ class CheckpointManager:
         if not load_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {load_path}")
 
-        checkpoint = torch.load(load_path, map_location=device)
+        # weights_only=False: we intentionally store optimizer state, epoch, and metric
+        # metadata alongside model weights. Only load checkpoints from trusted sources.
+        checkpoint = torch.load(load_path, map_location=device, weights_only=False)
         state_dict = checkpoint["model_state_dict"]
 
         # Strip 'module.' prefix if weights were saved from DDP and model is non-DDP

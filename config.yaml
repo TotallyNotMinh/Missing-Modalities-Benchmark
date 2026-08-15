@@ -1,0 +1,203 @@
+# =============================================================================
+# pipeline config.yaml
+# SINGLE SOURCE OF TRUTH for the entire benchmark.
+# Every script (synthesis train/eval, segmentation train/eval, Oracle eval)
+# must load this file via pipeline_utils.load_config() rather than
+# hardcoding any of these values locally.
+# =============================================================================
+
+seed: 42                       # global RNG seed — also used to derive
+                                # per-worker DataLoader seeds (see pipeline_utils)
+
+# Hardware defaults
+device: "cuda"
+num_workers: 4
+pin_memory: true
+
+paths:
+  raw_data_root: "data/raw/brats2020"          # root directory containing raw BraTS cases
+  raw_dir: "data/raw/brats2020"                # alias for backward-compatibility
+  splits_file: "data/splits/splits.json"       # generated ONCE by make_splits.py
+  preprocessed_cache: "data/processed"         # preprocessed volume storage
+  processed_dir: "data/processed"              # alias for backward-compatibility
+  oracle_weights: "checkpoints/oracle_nnunet"  # pretrained nnU-Net weights
+  checkpoints_dir: "checkpoints"
+  outputs_dir: "outputs"
+  results_dir: "results"
+  logs_dir: "results/logs"
+
+modalities:
+  # canonical channel order — every model, every script, must respect this
+  order: ["t1", "t1ce", "t2", "flair"]
+  seg_suffix: "seg"
+
+labels:
+  # BraTS convention — used identically by every Dice/HD95 computation
+  whole_tumor: [1, 2, 4]
+  tumor_core: [1, 4]
+  enhancing_tumor: [4]
+
+split:
+  ratios: {train: 0.70, val: 0.15, test: 0.15}
+  patient_wise: true            # never split slices/patches across sets
+  # NOTE: split is computed once by make_splits.py and written to
+  # paths.splits_file. Every downstream script LOADS that file — none
+  # of them may call a train_test_split function independently.
+
+preprocessing:
+  target_spacing_mm: [1.0, 1.0, 1.0]
+  normalization: "zscore_per_modality_per_patient"
+  foreground_crop: true
+  interpolation:
+    image: "bspline"
+    mask: "nearest"
+
+patch:
+  size: [128, 128, 128]         # used by synthesis AND segmentation, train
+                                 # AND val/test (val/test = deterministic
+                                 # center crop at this same size)
+  full_volume_shape: [240, 240, 155]
+  train_sampling: "random"      # random location within volume, train only
+  eval_sampling: "center"       # deterministic, val/test only
+
+# -----------------------------------------------------------------------
+# SYNTHESIS augmentation policy — pairing-safe (identical spatial transform
+# applied jointly across all 4 modalities + mask; intensity transforms
+# applied per-modality independently)
+# -----------------------------------------------------------------------
+augmentation_synthesis:
+  train_only: true              # never applied at val/test
+  spatial:
+    flip:
+      axes: ["sagittal"]        # L-R only
+      prob: 0.5
+    rotation:
+      mode: "inplane_axial"
+      range_deg: [-10, 10]
+      prob: 0.5
+    elastic_deformation: null   # explicitly excluded — see design notes
+  intensity:
+    # applied per-modality independently (only exception to "identical
+    # transform across modalities" rule)
+    gamma_jitter:
+      range: [0.9, 1.1]
+      prob: 0.3
+    gaussian_noise:
+      sigma_range: [0.01, 0.03]
+      prob: 0.2
+  excluded:
+    - "elastic_deformation"
+    - "mixup_cutmix"
+    - "independent_per_modality_spatial_transforms"
+    - "rgb_style_color_jitter"
+
+# -----------------------------------------------------------------------
+# SEGMENTATION augmentation policy — nnU-Net-derived, matched to Oracle's
+# pretrained-weight augmentation regime for fairness (see design notes)
+# -----------------------------------------------------------------------
+augmentation_segmentation:
+  train_only: true
+  spatial:
+    flip:
+      axes: ["sagittal", "coronal", "axial"]   # 3-axis, matches nnU-Net default
+      prob_per_axis: 0.5
+    rotation:
+      mode: "3d_per_axis"
+      range_deg: [-30, 30]
+      prob: 0.20
+    scaling:
+      range: [0.7, 1.4]
+      prob: 0.20
+    elastic_deformation:
+      sigma_range: [5, 8]
+      magnitude_range: [50, 150]
+      prob: 0.15
+      note: "nnU-Net-INSPIRED, not an exact replication of its auto-configured params"
+  intensity:
+    gaussian_noise:
+      variance_range: [0.0, 0.1]   # sigma = sqrt(sampled_variance), NOT fixed
+      prob: 0.20
+    gaussian_blur:
+      sigma_range: [0.5, 1.0]
+      prob: 0.20
+    brightness:
+      multiplier_range: [0.75, 1.25]
+      prob: 0.15
+    contrast:
+      range: [0.75, 1.25]
+      prob: 0.15
+    gamma_with_inversion:
+      range: [0.7, 1.5]
+      prob: 0.10
+    gamma_without_inversion:
+      range: [0.7, 1.5]
+      prob: 0.30
+    simulate_low_resolution:
+      downsample_scale_range: [0.5, 1.0]
+      prob: 0.20
+
+# -----------------------------------------------------------------------
+# Missing-modality simulation — MUST be applied AFTER augmentation,
+# AFTER normalization, immediately before model input. Never before
+# spatial/intensity augmentation (see pipeline ordering note).
+# -----------------------------------------------------------------------
+missing_modality:
+  apply_order: "after_augmentation_after_normalization"
+  scenarios:
+    - name: "S1"
+      drop: ["flair"]
+      clinical_motivation: "FLAIR absent — most commonly missing in retrospective data."
+    - name: "S2"
+      drop: ["t1ce"]
+      clinical_motivation: "T1ce absent — contrast skipped (allergy or cost)."
+    - name: "S3"
+      drop: ["t1"]
+      clinical_motivation: "T1 absent — pre-contrast occasionally omitted."
+    - name: "S4"
+      drop: ["t2"]
+      clinical_motivation: "T2 absent — emergency scanning protocol."
+    - name: "single_missing_t1ce"
+      drop: ["t1ce"]
+    - name: "single_missing_flair"
+      drop: ["flair"]
+    - name: "two_missing"
+      drop: ["t1ce", "flair"]
+    - name: "three_missing"
+      drop: ["t1ce", "t2", "flair"]
+
+# -----------------------------------------------------------------------
+# Synthesis-output -> segmentation-input junction
+# -----------------------------------------------------------------------
+junction:
+  synthesis_output_range: "tanh_[-1,1]"   # set to match your actual generator head
+  renormalize_to: "zscore_per_modality_per_patient"   # must match preprocessing.normalization
+  augmentation_at_junction: "none"        # always deterministic — never re-augmented
+  crop_alignment: "shared_coordinate_reference_per_case"
+
+evaluation:
+  metrics: ["dice", "hd95"]
+  # Implementation: custom numpy (Dice + KDTree HD95). See src/metrics/segmentation.py
+  statistics:
+    test: "paired_wilcoxon"     # or paired t-test — pick one, use everywhere
+    equivalence_test: "TOST"
+    alpha: 0.05
+  determinism:
+    augmentation: false
+    patch_sampling: "center"
+
+# Training defaults
+training:
+  max_epochs: 200
+  batch_size: 2
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  early_stopping_patience: 20
+  val_interval: 5
+  amp: true
+  gradient_clip: 1.0
+
+# nnUNet env vars
+nnunet:
+  raw: "data/raw"
+  preprocessed: "data/processed"
+  results: "checkpoints"

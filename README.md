@@ -40,32 +40,66 @@ This benchmark evaluates two competing paradigms across 4 standard single-modali
 3. **Metric Decoupling Analysis**: Investigate whether pixel-level fidelity metrics (PSNR, SSIM) genuinely correlate with or decouple from downstream clinical task utility (Dice, HD95).
 
 ```
-                 ┌─────────────────────────────────────────────────────────┐
-                 │       Incomplete 3-Modality Patient MRI Volume          │
-                 │         e.g., S1: [T1, T1ce, T2] (Missing FLAIR)         │
-                 └────────────────────────────┬────────────────────────────┘
-                                              │
-                     ┌────────────────────────┴────────────────────────┐
-                     ▼                                                 ▼
-     ┌───────────────────────────────┐                 ┌───────────────────────────────┐
-     │  Paradigms 1: Modality Synth  │                 │  Paradigm 2: Native Handling  │
-     │  (Pix2Pix, Med-DDPM, LDM)     │                 │  (AdaMM, mmFormer, RFNet)     │
-     └───────────────┬───────────────┘                 └───────────────┬───────────────┘
-                     ▼                                                 │
-     ┌───────────────────────────────┐                                 │
-     │ Synthesized 4-Channel Stack   │                                 │
-     │ [T1, T1ce, T2, FLAIR_syn]     │                                 │
-     └───────────────┬───────────────┘                                 │
-                     ▼                                                 │
-     ┌───────────────────────────────┐                                 │
-     │ Frozen Oracle Segmenter       │                                 │
-     │ (nnU-Net v2 / SwinUNETR)      │                                 │
-     └───────────────┬───────────────┘                                 │
-                     ▼                                                 ▼
-     ┌─────────────────────────────────────────────────────────────────────────────────┐
-     │                     Downstream Tumor Segmentation (WT, TC, ET)                  │
-     │                   Evaluation: Dice, HD95, Volumetric Error, TOST                │
-     └─────────────────────────────────────────────────────────────────────────────────┘
+                                  [ BraTS 2020 Raw NIfTI ]
+                                             │
+                                             ▼
+                               [ src/data/preprocess.py ]
+                         (N4 Correction -> 1mm³ Isotropic Resample
+                          -> Z-Score Normalization -> Skull-Stripped)
+                                             │
+                                             ▼
+                                    [ data/processed/ ]
+                                             │
+                       ┌─────────────────────┴─────────────────────┐
+                       ▼                                           ▼
+             [ make_splits() / splits.py ]               [ scenarios.py ]
+          (Frozen 70/15/15 Patient Split)             (Canonical S1-S4 Scenarios)
+                       │                                           │
+                       └─────────────────────┬─────────────────────┘
+                                             │
+                                             ▼
+                                  [ brats_dataset.py ]
+                               (Loads 4 channels: (4, H, W, D))
+                                             │
+                                             ▼
+                                  [ augmentation.py ]
+                         ┌───────────────────┴───────────────────┐
+                         ▼                                       ▼
+             Synthesis Augmentation                  Segmentation Augmentation
+           (Conservative, Pairing-Safe)               (nnU-Net Standard 3D Policy)
+                         │                                       │
+                         └───────────────────┬───────────────────┘
+                                             │
+                                             ▼
+                                   [ dataloader.py ]
+                       (Yields batches with inputs, target, mask)
+                                             │
+        ┌────────────────────────────────────┼────────────────────────────────────┐
+        ▼                                    ▼                                    ▼
+[ Synthesis Training ]             [ RQ1 Evaluation ]                   [ RQ2 Evaluation ]
+(Pix2Pix / Med-DDPM /              (Frozen 4-Ch Segmenters:             (Missing-Modality Models:
+ 3D-MedDiffusion)                   nnU-Net v2, SwinUNETR)               AdaMM, mmFormer, RFNet)
+        │                                    │                                    │
+        ▼                                    │                                    │
+[ Synthetic Modality Volume ]                │                                    │
+        │                                    │                                    │
+        ▼                                    │                                    │
+[ renormalize_synthetic_output() ]           │                                    │
+(tanh/sigmoid -> z-score junction)           │                                    │
+        │                                    │                                    │
+        └────────────────────────────────────┴────────────────────────────────────┘
+                                             │
+                                             ▼
+                                 [ src/metrics/ ]
+                     ┌───────────────────────┴───────────────────────┐
+                     ▼                                               ▼
+          [ segmentation.py ]                              [ reconstruction.py ]
+    (Subregions: WT, TC, ET;                         (PSNR, SSIM, MAE, MSE
+     Dice & Surface-Voxel KDTree HD95)                over Foreground Brain)
+                                             │
+                                             ▼
+                                [ aggregate_results.py ]
+                     (Generates Tables 1-3 & RQ3 Correlation Vectors)
 ```
 
 ---
@@ -74,30 +108,41 @@ This benchmark evaluates two competing paradigms across 4 standard single-modali
 
 ```
 Missing-Modalities-Benchmark/
-├── configs/                     # Centralized YAML configuration files
-│   └── default.yaml             # Global paths, patch sizes, seeds, hyperparameters
+├── config.yaml                  # Single source of truth (seeds, paths, patches, augmentations)
+├── pipeline_utils.py            # Root re-export of core pipeline utilities
+├── CODEBASE_SUMMARY.md          # Comprehensive architectural and per-file guide
+├── plan.md                      # Complete study plan, research questions & hypotheses
+├── configs/                     # Model-specific YAML configuration overrides
 ├── data/
 │   ├── raw/                     # Raw BraTS 2020 data (MICCAI_BraTS2020_TrainingData)
 │   ├── processed/               # Standardized preprocessed volumes (train/val/test)
 │   └── splits/
 │       └── splits.json          # Frozen deterministic 70/15/15 patient split
 ├── figures/                     # Methodological diagrams and benchmark charts
-├── plan.md                      # Complete study plan, research questions & hypotheses
 ├── src/
 │   ├── data/
 │   │   ├── __init__.py          # Data module exports
 │   │   ├── brats_dataset.py     # Volumetric BraTS NIfTI dataset loader
 │   │   ├── augmentation.py      # Dual-policy augmentation protocols (Synthesis & Segmentation)
 │   │   ├── dataloader.py        # PyTorch DataLoaders with scenario builders
+│   │   ├── preprocess.py        # Offline N4, resampling, skull-strip & z-score pipeline
 │   │   ├── scenarios.py         # Missing-modality scenario masks (S1, S2, S3, S4)
-│   │   └── splits.py            # Deterministic split manager and symlinker
+│   │   └── splits.py            # Deterministic split manager (70/15/15)
 │   ├── metrics/
 │   │   ├── __init__.py          # Metrics exports
-│   │   ├── segmentation.py      # Multi-class Dice and Hausdorff Distance 95 (HD95)
-│   │   └── synthesis.py         # 3D PSNR and 3D Structural Similarity Index (SSIM)
-│   ├── models/                  # Evaluator and missing-modality wrappers
-│   ├── utils/                   # General utility functions and logging
-│   └── visualization/           # Slice plotting and metric correlation visualizers
+│   │   ├── segmentation.py      # Subregions (WT/TC/ET), Dice & Surface-Voxel KDTree HD95
+│   │   └── reconstruction.py    # Foreground PSNR, Axial SSIM, MAE, and MSE
+│   ├── utils/
+│   │   ├── __init__.py          # Utility exports
+│   │   ├── pipeline_utils.py    # Core pipeline implementation & config loader
+│   │   ├── checkpoint.py        # Checkpoint manager & early stopping
+│   │   └── logger.py            # JSONL & formatted experiment logger
+│   ├── analysis/
+│   │   ├── __init__.py          # Analysis exports
+│   │   └── aggregate_results.py # Post-hoc RQ1, RQ2, and RQ3 summary table aggregator
+│   └── visualization/           # Slice plotting and metric visualizers
+├── tests/
+│   └── test_pipeline.py         # 9-point self-contained automated verification suite
 ├── requirements.txt             # Python dependency requirements
 └── README.md                    # Project documentation
 ```

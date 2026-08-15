@@ -7,7 +7,7 @@ import numpy as np
 
 # BraTS 2020 file suffix for each modality channel (must match channel order in scenarios.py)
 # Index 0=T1, 1=T1ce, 2=T2, 3=FLAIR
-MODALITY_SUFFIXES = ["t1", "t1ce", "t2", "flair"]
+from .scenarios import MODALITY_SUFFIXES
 SEG_SUFFIX = "seg"
 
 

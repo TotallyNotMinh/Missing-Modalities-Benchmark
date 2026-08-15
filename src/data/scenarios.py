@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
+import numpy as np
 import torch
 
-# Canonical channel ordering for BraTS 2020 (index → modality)
+# Canonical channel ordering for BraTS 2020 (index -> modality)
 MODALITY_NAMES = ["T1", "T1ce", "T2", "FLAIR"]
 MODALITY_SUFFIXES = ["t1", "t1ce", "t2", "flair"]  # file suffix order
 
@@ -67,6 +68,27 @@ SCENARIOS: Dict[str, Scenario] = {
 }
 
 
+def validate_scenarios_against_config(cfg: dict) -> None:
+    """Validates that the hardcoded SCENARIOS registry is consistent with config.yaml.
+    Call this once at startup to catch drift between code and config."""
+    config_scenarios = {s["name"]: s for s in cfg["missing_modality"]["scenarios"]}
+    modality_order = [m.lower() for m in cfg.get("modalities", {}).get("order", ["t1", "t1ce", "t2", "flair"])]
+    
+    for name, scenario in SCENARIOS.items():
+        if name not in config_scenarios:
+            raise ValueError(
+                f"Scenario '{name}' exists in code but not in config.yaml. "
+                f"Config scenarios: {list(config_scenarios.keys())}"
+            )
+        cfg_drop = [d.lower() for d in config_scenarios[name]["drop"]]
+        code_target = MODALITY_SUFFIXES[scenario.target_index]
+        if code_target not in cfg_drop:
+            raise ValueError(
+                f"Scenario '{name}' mismatch: code drops '{code_target}' "
+                f"but config drops {cfg_drop}"
+            )
+
+
 class ScenarioBuilder:
     """
     Applies a missing-modality scenario to a full 4-channel volume.
@@ -84,27 +106,40 @@ class ScenarioBuilder:
             )
         self.scenario = SCENARIOS[scenario_id]
 
-    def apply(self, volume: torch.Tensor) -> Dict[str, torch.Tensor | int]:
+    def apply(self, volume: Union[torch.Tensor, np.ndarray]) -> Dict[str, Union[torch.Tensor, np.ndarray, int, str]]:
         """
         Applies the scenario to a full 4-channel volume.
 
         Args:
-            volume: Full 4-channel MRI tensor of shape (4, H, W, D).
+            volume: Full 4-channel MRI tensor of shape (4, H, W, D) or (B, 4, H, W, D).
 
         Returns:
             Dict with:
-                'inputs'       : (3, H, W, D) available modalities.
-                'target'       : (1, H, W, D) missing modality.
+                'inputs'       : available modalities.
+                'target'       : missing modality.
                 'missing_flag' : int index of missing modality.
                 'scenario'     : scenario name string.
         """
-        if volume.dim() != 4 or volume.shape[0] != 4:
-            raise ValueError(
-                f"Expected volume of shape (4, H, W, D), got {tuple(volume.shape)}"
-            )
+        is_numpy = isinstance(volume, np.ndarray)
+        if is_numpy:
+            volume = torch.from_numpy(volume)
 
-        inputs = volume[list(self.scenario.input_indices)]      # (3, H, W, D)
-        target = volume[[self.scenario.target_index]]           # (1, H, W, D)
+        if volume.dim() == 4:
+            if volume.shape[0] != 4:
+                raise ValueError(f"Expected 4 channels in volume (4, H, W, D), got {tuple(volume.shape)}")
+            inputs = volume[list(self.scenario.input_indices)]
+            target = volume[[self.scenario.target_index]]
+        elif volume.dim() == 5:
+            if volume.shape[1] != 4:
+                raise ValueError(f"Expected 4 channels in volume (B, 4, H, W, D), got {tuple(volume.shape)}")
+            inputs = volume[:, list(self.scenario.input_indices)]
+            target = volume[:, [self.scenario.target_index]]
+        else:
+            raise ValueError(f"Expected volume of dim 4 or 5, got {volume.dim()} with shape {tuple(volume.shape)}")
+
+        if is_numpy:
+            inputs = inputs.numpy()
+            target = target.numpy()
 
         return {
             "inputs": inputs,
@@ -113,34 +148,68 @@ class ScenarioBuilder:
             "scenario": self.scenario.name,
         }
 
-    def reconstruct_full(self, inputs: torch.Tensor, synthetic: torch.Tensor) -> torch.Tensor:
+    def reconstruct_full(
+        self,
+        inputs: Union[torch.Tensor, np.ndarray],
+        synthetic: Union[torch.Tensor, np.ndarray]
+    ) -> Union[torch.Tensor, np.ndarray]:
         """
         Reconstructs a full 4-channel volume from available + synthetic modality.
         Used when feeding nnU-Net / SwinUNETR in Synthetic mode.
 
         Args:
             inputs: (3, H, W, D) or (B, 3, H, W, D) real available channels.
-            synthetic: (1, H, W, D) or (B, 1, H, W, D) synthesized missing channel.
+            synthetic: (1, H, W, D), (H, W, D), (B, 1, H, W, D), or (B, H, W, D) synthesized channel.
 
         Returns:
             (4, H, W, D) or (B, 4, H, W, D) full volume in canonical T1/T1ce/T2/FLAIR order.
         """
+        is_numpy = isinstance(inputs, np.ndarray)
+        if is_numpy:
+            inputs = torch.from_numpy(inputs)
+        if isinstance(synthetic, np.ndarray):
+            synthetic = torch.from_numpy(synthetic)
+
+        synthetic = synthetic.to(dtype=inputs.dtype, device=inputs.device)
+
         is_batched = inputs.dim() == 5
         if is_batched:
-            B, _, H, W, D = inputs.shape
+            B, C_in, H, W, D = inputs.shape
+            if C_in != 3:
+                raise ValueError(f"Expected 3 input channels for batched inputs, got {C_in}")
+            # Ensure synthetic is shape (B, 1, H, W, D)
+            if synthetic.dim() == 4:
+                synthetic = synthetic.unsqueeze(1)
+            elif synthetic.dim() == 3:
+                synthetic = synthetic.unsqueeze(0).unsqueeze(0)
+
             full = torch.zeros(B, 4, H, W, D, dtype=inputs.dtype, device=inputs.device)
             for out_idx, in_idx in enumerate(self.scenario.input_indices):
                 full[:, in_idx] = inputs[:, out_idx]
             full[:, self.scenario.target_index] = synthetic[:, 0]
         else:
+            C_in = inputs.shape[0]
+            if C_in != 3:
+                raise ValueError(f"Expected 3 input channels for unbatched inputs, got {C_in}")
+            # Ensure synthetic is shape (1, H, W, D) or (H, W, D)
+            if synthetic.dim() == 4 and synthetic.shape[0] == 1:
+                synthetic_sq = synthetic[0]
+            elif synthetic.dim() == 3:
+                synthetic_sq = synthetic
+            else:
+                synthetic_sq = synthetic.squeeze()
+
             full = torch.zeros(4, *inputs.shape[1:], dtype=inputs.dtype, device=inputs.device)
             for out_idx, in_idx in enumerate(self.scenario.input_indices):
                 full[in_idx] = inputs[out_idx]
-            full[self.scenario.target_index] = synthetic[0]
+            full[self.scenario.target_index] = synthetic_sq
 
-        return full
+        return full.numpy() if is_numpy else full
 
-    def reconstruct_native(self, inputs: torch.Tensor) -> torch.Tensor:
+    def reconstruct_native(
+        self,
+        inputs: Union[torch.Tensor, np.ndarray]
+    ) -> Union[torch.Tensor, np.ndarray]:
         """
         Reconstructs a 4-channel volume by zero-padding the missing modality.
         Used to feed a 4-channel model (like nnU-Net) in 'native_missing' mode.
@@ -151,9 +220,13 @@ class ScenarioBuilder:
         Returns:
             (4, H, W, D) or (B, 4, H, W, D) full volume with zeroed target channel.
         """
+        is_numpy = isinstance(inputs, np.ndarray)
+        if is_numpy:
+            inputs = torch.from_numpy(inputs)
+
         is_batched = inputs.dim() == 5
         if is_batched:
-            B, _, H, W, D = inputs.shape
+            B, C_in, H, W, D = inputs.shape
             full = torch.zeros(B, 4, H, W, D, dtype=inputs.dtype, device=inputs.device)
             for out_idx, in_idx in enumerate(self.scenario.input_indices):
                 full[:, in_idx] = inputs[:, out_idx]
@@ -162,4 +235,4 @@ class ScenarioBuilder:
             for out_idx, in_idx in enumerate(self.scenario.input_indices):
                 full[in_idx] = inputs[out_idx]
 
-        return full
+        return full.numpy() if is_numpy else full
