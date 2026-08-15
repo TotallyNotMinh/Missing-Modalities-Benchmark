@@ -124,8 +124,8 @@ To eliminate data processing discrepancies as a confound, all MRI volumes pass t
 1. **Anatomical Reorientation (`IPL`)**:
    * Reorients all incoming NIfTI scans to standard **Inferior-Posterior-Left (IPL)** space using `nibabel.orientations.ornt_transform`.
 2. **Whole-Brain Bounding Box Extraction**:
-   * Raw BraTS scans contain $>60\%$ empty black air background (`240 × 240 × 155`).
-   * Volumes are cropped to the skull/brain bounding box (`144 × 192 × 192`), saving $>50\%$ VRAM without losing any brain tissue.
+   * Raw BraTS scans ($240 \times 240 \times 155 = 8.93\text{M voxels}$) contain $>60\%$ empty black background air outside the skull.
+   * Volumes are tightly cropped to the anatomical brain bounding box ($144 \times 192 \times 192 = 5.31\text{M voxels}$), yielding a **$40.5\%$ reduction in voxel volume** and proportionally reducing GPU memory overhead per batch without discarding any brain parenchyma.
 3. **Voxel Intensity Normalization**:
    * Scaled per-modality to $[0.0, 1.0]$ via min-max normalization:
      $$X_{\text{norm}} = \frac{X - X_{\min}}{X_{\max} - X_{\min}}$$
