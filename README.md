@@ -232,54 +232,6 @@ manager.create_splits(train_ratio=0.70, val_ratio=0.15, test_ratio=0.15)
 manager.setup_split_directories(processed_dir="data/processed")
 ```
 
-### 7.3 Training Synthesis Models
-To train the Universal 3D Pix2Pix model on Dual NVIDIA T4 GPUs:
-```bash
-python train.py \
-  --dataroot data/processed \
-  --dataset_name train \
-  --val_dataset_name val \
-  --name universal_pix2pix_3d \
-  --model pix2pix \
-  --dataset_mode brain_3D_random_mod \
-  --B_modality random \
-  --input_nc 8 \
-  --output_nc 1 \
-  --netG unet_3d \
-  --netD basic \
-  --ngf 32 \
-  --ndf 32 \
-  --batch_size 2 \
-  --gpu_ids 0,1 \
-  --amp \
-  --n_epochs 50 \
-  --n_epochs_decay 70 \
-  --lr 0.0002 \
-  --lambda_L1 100.0 \
-  --lambda_perceptual 0.0 \
-  --save_epoch_freq 10
-```
-
-### 7.4 Downstream Segmentation Evaluation
-Synthesize missing sequences on the test split for Scenario $S_1$ (FLAIR):
-```bash
-python test.py \
-  --dataroot data/processed \
-  --test_dataset_name test \
-  --name universal_pix2pix_3d \
-  --model pix2pix \
-  --dataset_mode brain_3D_random_mod \
-  --B_modality flair \
-  --input_nc 8 \
-  --output_nc 1 \
-  --netG unet_3d \
-  --ngf 32 \
-  --batch_size 1 \
-  --gpu_ids 0 \
-  --epoch latest \
-  --results_dir results/S1_flair_synthetic
-```
-
 ---
 
 ## 8. Evaluation Metrics
