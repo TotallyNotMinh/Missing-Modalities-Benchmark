@@ -134,6 +134,12 @@ To eliminate data processing discrepancies as a confound, all MRI volumes pass t
 5. **Zero-Distortion Test Reconstruction**:
    * When saving synthesized modalities, volumes are un-padded back to native **$240 \times 240 \times 155$** matrices. Downstream segmentation models load the real and synthesized scans in identical native spatial coordinates.
 
+> [!IMPORTANT]
+> **Standardized Segmentation Input ($128^3$)**:
+> All downstream segmentation models (`nnU-Net v2`, `SwinUNETR`, `AdaMM`, `mmFormer`, `RFNet`) strictly operate on **$128 \times 128 \times 128$** volumetric inputs.
+> * **Training**: The dataloader extracts random $128^3$ spatial patches with joint spatial augmentations.
+> * **Validation & Testing**: Evaluated on deterministic $128^3$ center crops (or $128^3$ sliding-window inference), ensuring exact spatial alignment across real and synthesized modalities against ground truth segmentation masks.
+
 ---
 
 ## 5. Controlled Augmentation Protocols
