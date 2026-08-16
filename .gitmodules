@@ -1,0 +1,15 @@
+[submodule "externals/pix2pix"]
+	path = externals/pix2pix
+	url = https://github.com/TotallyNotMinh/pix2pix-for-modality-synthesis.git
+[submodule "externals/nnunet"]
+	path = externals/nnunet
+	url = https://github.com/mic-dkfz/nnunet.git
+[submodule "externals/mmformer"]
+	path = externals/mmformer
+	url = https://github.com/YaoZhang93/mmFormer.git
+[submodule "externals/rfnet"]
+	path = externals/rfnet
+	url = https://github.com/dyh127/RFNet.git
+[submodule "externals/swinunet"]
+	path = externals/swinunet
+	url = https://github.com/HUCAOFIGHTING/SWIN-UNET
