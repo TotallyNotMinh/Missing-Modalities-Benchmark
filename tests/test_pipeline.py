@@ -159,38 +159,47 @@ def test_scenarios_and_reconstruction():
     cfg = pu.load_config()
 
     # Test all scenarios
-    scenarios_target_map = {"S1": 3, "S2": 1, "S3": 0, "S4": 2}
-    for sc_name, target_idx in scenarios_target_map.items():
+    scenarios_target_map = {
+        "S1": (3,), "S2": (1,), "S3": (0,), "S4": (2,),
+        "two_missing": (1, 3), "three_missing": (1, 2, 3)
+    }
+    for sc_name, target_indices in scenarios_target_map.items():
         builder = ScenarioBuilder(sc_name)
-        assert builder.scenario.target_index == target_idx
+        assert builder.scenario.target_indices == target_indices
+
+        num_inputs = 4 - len(target_indices)
+        num_targets = len(target_indices)
 
         # 4D Volume test (4, H, W, D)
         vol_4d = torch.arange(4, dtype=torch.float32).view(4, 1, 1, 1).expand(4, 10, 10, 10).clone()
         res_4d = builder.apply(vol_4d)
-        assert res_4d["inputs"].shape == (3, 10, 10, 10)
-        assert res_4d["target"].shape == (1, 10, 10, 10)
-        assert res_4d["missing_flag"] == target_idx
+        assert res_4d["inputs"].shape == (num_inputs, 10, 10, 10)
+        assert res_4d["target"].shape == (num_targets, 10, 10, 10)
+        assert res_4d["missing_flag"] == target_indices
 
         # Synthetic reconstruction
-        synth_chan = torch.full((1, 10, 10, 10), 99.0)
+        synth_chan = torch.full((num_targets, 10, 10, 10), 99.0)
         reconstructed = builder.reconstruct_full(res_4d["inputs"], synth_chan)
         assert reconstructed.shape == (4, 10, 10, 10)
-        assert torch.all(reconstructed[target_idx] == 99.0), f"Reconstructed target channel mismatch in {sc_name}"
+        for t_idx in target_indices:
+            assert torch.all(reconstructed[t_idx] == 99.0), f"Reconstructed target channel mismatch in {sc_name}"
 
         # Native missing (zero padding)
         native = builder.reconstruct_native(res_4d["inputs"])
         assert native.shape == (4, 10, 10, 10)
-        assert torch.all(native[target_idx] == 0.0), f"Native zero-padding mismatch in {sc_name}"
+        for t_idx in target_indices:
+            assert torch.all(native[t_idx] == 0.0), f"Native zero-padding mismatch in {sc_name}"
 
         # Batched 5D test (B, 4, H, W, D)
         vol_5d = torch.randn(2, 4, 10, 10, 10)
         res_5d = builder.apply(vol_5d)
-        assert res_5d["inputs"].shape == (2, 3, 10, 10, 10)
-        assert res_5d["target"].shape == (2, 1, 10, 10, 10)
-        synth_5d = torch.full((2, 1, 10, 10, 10), 88.0)
+        assert res_5d["inputs"].shape == (2, num_inputs, 10, 10, 10)
+        assert res_5d["target"].shape == (2, num_targets, 10, 10, 10)
+        synth_5d = torch.full((2, num_targets, 10, 10, 10), 88.0)
         rec_5d = builder.reconstruct_full(res_5d["inputs"], synth_5d)
         assert rec_5d.shape == (2, 4, 10, 10, 10)
-        assert torch.all(rec_5d[:, target_idx] == 88.0)
+        for t_idx in target_indices:
+            assert torch.all(rec_5d[:, t_idx] == 88.0)
 
     # Test pipeline_utils apply_missing_modality & stack_modalities
     v_dict = {"t1": np.ones((5,5,5)), "t1ce": np.ones((5,5,5)), "t2": np.ones((5,5,5)), "flair": np.ones((5,5,5))}

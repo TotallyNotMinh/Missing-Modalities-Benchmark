@@ -220,3 +220,4 @@ __marimo__/
 # Agent
 .agents
 .ua
+.codegraph/

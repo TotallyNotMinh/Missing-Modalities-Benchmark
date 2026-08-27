@@ -61,6 +61,8 @@ Existing MRI modality synthesis research primarily evaluates image reconstructio
 | S2       | T1, T2, FLAIR   | T1ce        | Contrast skipped (allergy, cost).           |
 | S3       | T1ce, T2, FLAIR | T1          | Pre‑contrast T1 occasionally omitted.      |
 | S4       | T1, T1ce, FLAIR | T2          | Emergency protocol.                         |
+| two_missing | T1, T2       | T1ce, FLAIR | Accelerated or abbreviated protocol.        |
+| three_missing | T1         | T1ce, T2, FLAIR | Extreme emergency / triage.             |
 
 ---
 
@@ -68,11 +70,12 @@ Existing MRI modality synthesis research primarily evaluates image reconstructio
 
 | Generator                  | Type                  | Why included                                                                                    |
 | -------------------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
-| **Pix2Pix**          | Conditional GAN (2D/3D) | Paired‑data GAN baseline. Fast, simple. Represents GAN‑based synthesis.                         |
-| **Med‑DDPM**        | DDPM (3D)             | Volumetric diffusion baseline. Represents native 3D diffusion without latent space compression. |
-| **3D‑MedDiffusion** | Latent diffusion (3D) | State‑of‑the‑art 3D latent diffusion. Represents the modern LDM paradigm (fast, low-memory). |
+| **PS-MIT**           | Flow Matching         | State-of-the-art native arbitrary missingness (Category A) with robust 3->1 capability.         |
+| **M2DN**             | Diffusion (DDPM)      | State-of-the-art native DDPM baseline designed for modality dropout.                            |
+| **ResViT**           | Hybrid Transformer/GAN| State-of-the-art ViT/GAN hybrid for multi-input feature fusion.                                 |
+| **CoLa-Diff**        | Latent Diffusion (3D) | State-of-the-art latent diffusion paradigm.                                                     |
 
-Three generators are evaluated to avoid a simple 1-vs-1 comparison and span across GANs, native 3D diffusion, and latent 3D diffusion. They bracket the quality range. Comparing Pix2Pix vs Med-DDPM vs 3D-MedDiffusion allows us to analyze the combined impact of dimensionality and generative framework.
+Four generators are evaluated to capture the state-of-the-art across modern generative paradigms (Flow Matching, DDPM, Latent Diffusion, and ViT/GANs). By replacing obsolete baselines with vetted candidates, the benchmark rigorously tests the upper bounds of synthesis quality.
 
 ### Training Protocol
 
@@ -130,14 +133,17 @@ Each missing‑modality model is compared **against itself** under two input con
 | **AdaMM**    | Adaptive multi-modal fusion                | SOTA adaptive feature fusion missing-modality baseline.                                                     |
 | **mmFormer** | Multi‑modal transformer, cross‑attention | Transformer missing‑modality baseline.                                                                     |
 | **RFNet**    | CNN, region‑aware fusion                  | CNN missing‑modality baseline.                                                                             |
+| **UniME**    | Unified Masked Image Modeling ViT          | SOTA incomplete-modality prior via MIM. (Included conditionally based on pre-trained weights).              |
 
 #### Conditions (per model, per scenario)
 
 | Condition                | Input                                                   | Role                                                             |
 | ------------------------ | ------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Native missing** | 3 real channels + missing‑modality flag                | Model's own baseline — its designed behaviour.                  |
-| **+ Pix2Pix**      | 3 real + 1 Pix2Pix synthetic (full 4‑ch mode)          | Does GAN synthesis beat the model's internal compensation?       |
-| **+ 3D‑MedDiff**  | 3 real + 1 3D‑MedDiffusion synthetic (full 4‑ch mode) | Does diffusion synthesis beat the model's internal compensation? |
+| **Native missing** | Available real channels + missing flag                 | Model's own baseline — its designed behaviour.                  |
+| **+ PS-MIT**       | Available + PS-MIT synthetic (full 4-ch mode)          | Does Flow Matching beat native compensation?                     |
+| **+ M2DN**         | Available + M2DN synthetic (full 4-ch mode)            | Does DDPM beat native compensation?                              |
+| **+ ResViT**       | Available + ResViT synthetic (full 4-ch mode)          | Does ViT/GAN beat native compensation?                           |
+| **+ CoLa-Diff**    | Available + CoLa-Diff synthetic (full 4-ch mode)       | Does Latent Diffusion beat native compensation?                  |
 | **Oracle**         | 4 real channels                                         | Ceiling — how much room exists above native missing?            |
 
 #### Primary Readout
@@ -156,24 +162,25 @@ $$
 
 #### RQ1 — Substitute quality (evaluator models)
 
-| Evaluator   | Oracle    | + Pix2Pix | + Med-DDPM | + 3D‑MedDiff |
-| ----------- | --------- | --------- | ---------- | ------------- |
-| nnU‑Net v2 | ✅ S1–S4 | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     |
-| SwinUNETR   | ✅ S1–S4 | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     |
+| Evaluator   | Oracle    | + PS-MIT | + M2DN | + ResViT | + CoLa-Diff |
+| ----------- | --------- | -------- | ------ | -------- | ----------- |
+| nnU‑Net v2 | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   |
+| SwinUNETR   | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   |
 
-**2 evaluators × 4 conditions × 4 scenarios = 32 cells**
+**2 evaluators × 5 conditions × 6 scenarios = 60 cells**
 
 #### RQ2 — Synthesis vs native handling
 
-| Model    | Native missing | + Pix2Pix | + Med-DDPM | + 3D‑MedDiff | Oracle    |
-| -------- | -------------- | --------- | ---------- | ------------- | --------- |
-| AdaMM    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
-| mmFormer | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
-| RFNet    | ✅ S1–S4      | ✅ S1–S4 | ✅ S1–S4  | ✅ S1–S4     | ✅ S1–S4 |
+| Model    | Native missing | + PS-MIT | + M2DN | + ResViT | + CoLa-Diff | Oracle    |
+| -------- | -------------- | -------- | ------ | -------- | ----------- | --------- |
+| AdaMM    | ✅ All 6      | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   | ✅ All 6 |
+| mmFormer | ✅ All 6      | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   | ✅ All 6 |
+| RFNet    | ✅ All 6      | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   | ✅ All 6 |
+| UniME    | ✅ All 6      | ✅ All 6 | ✅ All 6 | ✅ All 6 | ✅ All 6   | ✅ All 6 |
 
-**3 models × 5 conditions × 4 scenarios = 60 cells**
+**4 models × 6 conditions × 6 scenarios = 144 cells**
 
-**Total: 92 evaluation cells** on ~54 test patients.
+**Total: 204 evaluation cells** on ~54 test patients.
 
 ![RQ1 vs RQ2 Experimental Setup Comparison](figures/02-comparison-rq1-rq2.jpg)
 
@@ -289,28 +296,30 @@ We stratify downstream segmentation errors (Dice drop) by:
 
 ### Generators
 
-- [ ] Train Pix2Pix (S1–S4).
-- [ ] Train Med-DDPM (S1–S4).
-- [ ] Train 3D‑MedDiffusion (S1–S4).
+- [ ] Wrap and validate PS-MIT (S1-S4, Multi-Missing).
+- [ ] Wrap and validate M2DN (S1-S4, Multi-Missing).
+- [ ] Wrap and validate ResViT (S1-S4, Multi-Missing).
+- [ ] Wrap and validate CoLa-Diff (S1-S4, Multi-Missing).
 - [ ] Generate synthetic modalities for val & test sets.
 - [ ] Compute PSNR / SSIM for all generated volumes.
 
 ### RQ1 — Substitute Quality
 
-- [ ] Run nnU‑Net v2 on oracle inputs (S1–S4).
-- [ ] Run nnU‑Net v2 on synthetic inputs (3 generators × S1–S4).
-- [ ] Run SwinUNETR on oracle inputs (S1–S4).
-- [ ] Run SwinUNETR on synthetic inputs (3 generators × S1–S4).
-- [ ] Compute Dice / HD95 for all 32 cells.
+- [ ] Run nnU‑Net v2 on oracle inputs (All 6 scenarios).
+- [ ] Run nnU‑Net v2 on synthetic inputs (4 generators × 6 scenarios).
+- [ ] Run SwinUNETR on oracle inputs (All 6 scenarios).
+- [ ] Run SwinUNETR on synthetic inputs (4 generators × 6 scenarios).
+- [ ] Compute Dice / HD95 for all 60 cells.
 
 ### RQ2 — Synthesis vs Native Handling
 
-- [ ] Train AdaMM, mmFormer, RFNet on incomplete training data.
-- [ ] Evaluate each in native missing mode (S1–S4).
-- [ ] Evaluate each with Pix2Pix synthetic input (S1–S4).
-- [ ] Evaluate each with Med-DDPM synthetic input (S1–S4).
-- [ ] Evaluate each with 3D‑MedDiffusion synthetic input (S1–S4).
-- [ ] Evaluate each on oracle (S1–S4).
+- [ ] Train AdaMM, mmFormer, RFNet, (and UniME) on incomplete training data.
+- [ ] Evaluate each in native missing mode (All 6 scenarios).
+- [ ] Evaluate each with PS-MIT synthetic input (All 6 scenarios).
+- [ ] Evaluate each with M2DN synthetic input (All 6 scenarios).
+- [ ] Evaluate each with ResViT synthetic input (All 6 scenarios).
+- [ ] Evaluate each with CoLa-Diff synthetic input (All 6 scenarios).
+- [ ] Evaluate each on oracle (All 6 scenarios).
 - [ ] Failure gallery (3–5 qualitative cases).
 - [ ] Statistical tests (Shapiro‑Wilk → Wilcoxon/t‑test → Bonferroni → effect sizes).
 - [ ] TOST equivalence test for Claim 1 (optional but recommended).

@@ -1,6 +1,18 @@
-[submodule "externals/pix2pix"]
-	path = externals/pix2pix
-	url = https://github.com/TotallyNotMinh/pix2pix-for-modality-synthesis.git
+[submodule "externals/ps-mit"]
+	path = externals/ps-mit
+	url = https://github.com/placeholder/ps-mit.git
+[submodule "externals/m2dn"]
+	path = externals/m2dn
+	url = https://github.com/placeholder/m2dn.git
+[submodule "externals/resvit"]
+	path = externals/resvit
+	url = https://github.com/placeholder/resvit.git
+[submodule "externals/cola-diff"]
+	path = externals/cola-diff
+	url = https://github.com/placeholder/cola-diff.git
+[submodule "externals/unime"]
+	path = externals/unime
+	url = https://github.com/placeholder/unime.git
 [submodule "externals/nnunet"]
 	path = externals/nnunet
 	url = https://github.com/mic-dkfz/nnunet.git

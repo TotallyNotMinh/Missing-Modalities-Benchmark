@@ -156,14 +156,12 @@ missing_modality:
     - name: "S4"
       drop: ["t2"]
       clinical_motivation: "T2 absent — emergency scanning protocol."
-    - name: "single_missing_t1ce"
-      drop: ["t1ce"]
-    - name: "single_missing_flair"
-      drop: ["flair"]
     - name: "two_missing"
       drop: ["t1ce", "flair"]
+      clinical_motivation: "Accelerated or abbreviated protocol."
     - name: "three_missing"
       drop: ["t1ce", "t2", "flair"]
+      clinical_motivation: "Extreme emergency / triage."
 
 # -----------------------------------------------------------------------
 # Synthesis-output -> segmentation-input junction
