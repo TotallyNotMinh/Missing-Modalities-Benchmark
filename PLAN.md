@@ -68,21 +68,21 @@ Existing MRI modality synthesis research primarily evaluates image reconstructio
 
 ## 2 Generators (Evaluated Models)
 
-| Generator                  | Type                  | Why included                                                                                    |
-| -------------------------- | --------------------- | ----------------------------------------------------------------------------------------------- |
-| **PS-MIT**           | Flow Matching         | State-of-the-art native arbitrary missingness (Category A) with robust 3->1 capability.         |
-| **M2DN**             | Diffusion (DDPM)      | State-of-the-art native DDPM baseline designed for modality dropout.                            |
-| **ResViT**           | Hybrid Transformer/GAN| State-of-the-art ViT/GAN hybrid for multi-input feature fusion.                                 |
-| **CoLa-Diff**        | Latent Diffusion (3D) | State-of-the-art latent diffusion paradigm.                                                     |
+| Generator                  | Type                  | Venue / Year          | Universality | Why included                                                                                    |
+| -------------------------- | --------------------- | --------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| **PS-MIT**           | Flow Matching         | arXiv 2024            | Category A   | Native arbitrary missingness via posterior sampling; BraTS 2020 verified; official code ([jongdory/PS-MIT](https://github.com/jongdory/PS-MIT)). |
+| **M2DN**             | Diffusion (DDPM)      | IEEE TMI 2024         | Category A   | Modality-masked diffusion designed for random dropout; BraTS 2018/2020 verified; Level 0 adaptation. |
+| **ResViT**           | Hybrid Transformer/GAN| IEEE TMI 2022         | Category B/C | Multi-input ViT + GAN fusion; BraTS 2018/IXI verified; official code ([icon-lab/ResViT](https://github.com/icon-lab/ResViT)). Requires Level 1 adaptation (retraining on BraTS 2020). |
+| **CoLa-Diff**        | Latent Diffusion (3D) | MICCAI 2023 / TMI 2024| Category B   | Latent-space diffusion with cross-attention conditioning; BraTS 2019/2020 verified; official code. Requires Level 1 adaptation. |
 
-Four generators are evaluated to capture the state-of-the-art across modern generative paradigms (Flow Matching, DDPM, Latent Diffusion, and ViT/GANs). By replacing obsolete baselines with vetted candidates, the benchmark rigorously tests the upper bounds of synthesis quality.
+Four generators are evaluated to span distinct modern generative paradigms (Flow Matching, DDPM, Latent Diffusion, and Transformer/GAN). All were selected from the [candidates report](synthesis_benchmark_candidates_report.md) based on official code availability, BraTS compatibility, and 3→1 support. See the candidates report for full evidence.
 
 ### Training Protocol
 
 - **Supervision**: paired — (available modalities) → (missing modality).
 - **Losses**: adversarial + L1 + SSIM / perceptual.
 - **Early stopping**: validation PSNR / SSIM, patience = 20 epochs.
-- **Freeze** after training. Generate synthetic modality for all val and test patients under S1–S4.
+- **Freeze** after training. Generate synthetic modality for all val and test patients under all 6 scenarios (S1–S4, two_missing, three_missing).
 
 ---
 
@@ -94,10 +94,21 @@ The segmentation model is a **frozen downstream evaluator**. It is not being tra
 
 #### Evaluators
 
-| Model                 | Architecture                       | Why this evaluator                                                                                                                           |
-| --------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **nnU‑Net v2** | Self‑configuring 3D U‑Net (CNN)  | Gold‑standard medical segmentation. Official BraTS 2020 weights → fully reproducible, no retraining.                                       |
-| **SwinUNETR**   | Swin‑Transformer + U‑Net decoder | Transformer‑based evaluator. If both CNN and Transformer respond similarly to the synthetic modality, the result is architecture‑agnostic. |
+| Model                 | Architecture                       | Weight Source                              | Why this evaluator                                                                                                                           |
+| --------------------- | ---------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **nnU‑Net v2** | Self‑configuring 3D U‑Net (CNN)  | Official BraTS 2020 challenge weights      | Gold‑standard medical segmentation. Fully reproducible, no retraining.                                                                     |
+| **SwinUNETR**   | Swin‑Transformer + U‑Net decoder | MONAI research-contributions (BraTS 2021 fine‑tuned) | Transformer‑based evaluator. Architecture‑agnostic comparison with nnU‑Net.                                                               |
+
+> [!WARNING]
+> **SwinUNETR weight provenance.** No official frozen BraTS 2020 SwinUNETR checkpoint exists. The best available option is the [Project-MONAI/research-contributions BraTS21](https://github.com/Project-MONAI/research-contributions/tree/main/SwinUNETR/BRATS21) checkpoint. Before using it, we must verify:
+> - **Training dataset**: BraTS 2021 (structurally compatible with BraTS 2020, but not identical).
+> - **Preprocessing**: MONAI default transforms (RandCropByPosNegLabel, NormalizeIntensity per-channel).
+> - **Modality ordering**: T1, T1ce, T2, FLAIR (matches our canonical order).
+> - **Input dimensions**: 128×128×128 ROI (matches our patch size).
+> - **Normalization**: Per-channel z-score (must confirm alignment with our `zscore_per_modality_per_patient`).
+> - **Labels**: WT/TC/ET using BraTS convention {1, 2, 4} (matches our label definitions).
+>
+> If any of these diverge from our pipeline, we must either (a) retrain SwinUNETR on our BraTS 2020 split, or (b) document the mismatch as a confound.
 
 > [!NOTE]
 > **Why two evaluators?** If nnU‑Net shows a small Dice drop but SwinUNETR shows a large one (or vice versa), the quality of the synthetic modality is architecture‑dependent — a finding worth reporting. If both agree, the conclusion is robust.
@@ -260,30 +271,33 @@ We stratify downstream segmentation errors (Dice drop) by:
 
 | Outcome                                                           | Interpretation                                                                                                 |
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| ΔDice < 1 % for 3D‑MedDiff, both evaluators                     | Excellent substitute. Diffusion‑synthesised modality preserves nearly all segmentation‑relevant information. |
-| ΔDice < 1 % for 3D‑MedDiff but > 3 % for Pix2Pix                | Generator quality is decisive. GAN synthesis is insufficient; diffusion is necessary.                          |
-| ΔDice > 3 % for both generators                                  | Current generators are not good enough. The gap is too large to call synthesis a viable substitute.            |
+| ΔDice < 1 % for best generator (e.g., PS-MIT or M2DN), both evaluators | Excellent substitute. Synthesis preserves nearly all segmentation‑relevant information.                       |
+| ΔDice < 1 % for diffusion/flow but > 3 % for ResViT             | Generator paradigm is decisive. Diffusion/flow matching outperform hybrid ViT/GAN for synthesis.               |
+| ΔDice > 3 % for all four generators                              | Current generators are not good enough. The gap is too large to call synthesis a viable substitute.            |
 | ΔDice varies by scenario (e.g., small for FLAIR, large for T1ce) | Some modalities are harder to synthesise than others. Claim holds conditionally.                               |
 | nnU‑Net and SwinUNETR show different ΔDice patterns             | Synthetic quality is architecture‑dependent — the claim needs qualification.                                 |
+| Multi-missing scenarios show catastrophic ΔDice (> 10 %)        | Synthesis viability degrades sharply under extreme missingness.                                                 |
 
 ### RQ2 (Synthesis vs Native Handling)
 
 | Outcome                                          | Interpretation                                                                                                                         |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Synthesis helps all three models                 | Generated modality carries information that even purpose‑built architectures cannot recover internally. Strong result.                |
+| Synthesis helps all four models                  | Generated modality carries information that even purpose‑built architectures cannot recover internally. Strong result.                |
 | Synthesis helps RFNet / mmFormer but not AdaMM   | AdaMM's adaptive fusion mechanism already recovers what the generator provides. Synthesis substitutes for architectural sophistication. |
-| Synthesis hurts all three models                 | Synthetic artefacts interfere with learned missing‑modality representations. Native handling is strictly better.                      |
-| Diffusion helps, GAN hurts                       | There is a generator quality threshold below which synthesis is harmful.                                                               |
+| Synthesis hurts all four models                  | Synthetic artefacts interfere with learned missing‑modality representations. Native handling is strictly better.                      |
+| Flow/diffusion helps, ViT/GAN hurts              | There is a generator quality threshold below which synthesis is harmful.                                                               |
+| UniME (if included) is immune to synthesis       | MIM pre-training already hallucinated sufficient features internally.                                                                  |
 
 ---
 
 ## 7 Stated Limitations
 
-1. **Three generators only.** Represents GANs and Diffusion but excludes newer models (e.g., Flow Matching).
-2. **No 3D GAN.** Cannot fully disentangle dimensionality from paradigm.
-3. **Single dataset (BraTS 2020).** May not generalise to other datasets.
-4. **Simulated missingness.** Real‑world missing data may differ.
-5. **Single‑modality‑missing only.** Two‑missing scenarios deferred.
+1. **Four generators only.** Spans Flow Matching, DDPM, Latent Diffusion, and Transformer/GAN, but excludes other paradigms (e.g., score-based models, normalising flows, wavelet diffusion).
+2. **ResViT is 2D slice‑wise.** Cannot fully disentangle 2D vs 3D effects from the generative paradigm itself. PS-MIT, M2DN, and CoLa-Diff operate in 3D.
+3. **Single dataset (BraTS 2020).** May not generalise to other anatomies, field strengths, or vendor protocols.
+4. **Simulated missingness.** All four modalities exist for every patient; missingness is artificially imposed. Real‑world missing data may have different characteristics.
+5. **SwinUNETR trained on BraTS 2021.** Preprocessing and label mapping are compatible but not identical to BraTS 2020. Any evaluation discrepancy may partially reflect dataset shift rather than synthetic quality alone.
+6. **Generator retraining required for two models.** ResViT and CoLa-Diff (Level 1 adaptation) must be retrained on our BraTS 2020 split. This introduces retraining variance not present in Level 0 models (PS-MIT, M2DN).
 
 ---
 
@@ -336,12 +350,12 @@ We stratify downstream segmentation errors (Dice drop) by:
 
 ### Figures
 
-- **Fig 1**: RQ1 results — paired bar chart (oracle vs synthetic) per evaluator, faceted by scenario and generator.
-- **Fig 2**: RQ2 results — grouped bars per missing‑modality model comparing native handling against each synthetic augmentation treatment.
-- **Fig 3**: RQ3 results — Joint scatter plots of SSIM/PSNR vs. $\Delta$Dice across test cases, showing regression lines and Spearman correlation ($\rho$).
-- **Fig 4**: Failure Analysis — Stratified bar charts of Dice drops grouped by tumor size classes and tumor composition/subregions.
-- **Fig 5**: Qualitative Failure Casebook — example slices annotated with specific failure types: (a) Lesion erasure, (b) Boundary blurring, (c) Spatial warping, (d) Contrast inversion.
+- **Fig 1**: RQ1 results — paired bar chart (oracle vs synthetic) per evaluator.
+- **Fig 2**: RQ2 results — grouped bars per missing‑modality model.
+- **Fig 3**: RQ3 results — Joint scatter plots of SSIM/PSNR vs. $\Delta$Dice across test cases.
+- **Fig 4**: Failure Analysis — Stratified bar charts of Dice drops grouped by tumor size and composition.
+- **Fig 5**: Qualitative Failure Casebook — example slices annotated with failure types.
 
 ### Conclusion Template
 
-> *"Using [nnU‑Net v2 / SwinUNETR] as a downstream evaluator, [3D‑MedDiffusion / Med-DDPM / Pix2Pix]‑synthesised [modality] achieved a downstream Dice within [X.X ± Y.Y %] of the real‑modality oracle (p = Z.ZZ, equivalence confirmed/not confirmed within a ±1 % margin). Notably, correlation analysis revealed that voxel-wise reconstruction metrics (PSNR, SSIM) [correlated strongly / decoupled] with downstream performance (Spearman's $\rho$ = W.WW), suggesting that pixel-level fidelity [is / is not] a reliable proxy for clinical task utility. Systematic failure analysis highlighted that translation models primarily failed due to [lesion erasure in small tumors / boundary blurring / contrast domain shifts]."*
+> *"Using [nnU‑Net v2 / SwinUNETR] as a downstream evaluator, [PS-MIT / M2DN / ResViT / CoLa-Diff]‑synthesised [modality] achieved a downstream Dice within [X.X ± Y.Y %] of the real‑modality oracle (p = Z.ZZ, equivalence confirmed/not confirmed within a ±1 % margin). Notably, correlation analysis revealed that voxel-wise reconstruction metrics (PSNR, SSIM) [correlated strongly / decoupled] with downstream performance (Spearman's $\rho$ = W.WW), suggesting that pixel-level fidelity [is / is not] a reliable proxy for clinical task utility. Systematic failure analysis highlighted that translation models primarily failed due to [lesion erasure in small tumors / boundary blurring / contrast domain shifts]."*
