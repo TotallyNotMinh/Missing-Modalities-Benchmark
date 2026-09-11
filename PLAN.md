@@ -22,6 +22,7 @@ Existing MRI modality synthesis research primarily evaluates image reconstructio
 | **RQ2** | Do models with built‑in missing‑modality handling benefit from receiving a synthesised modality instead of using their native compensation? | Same missing‑modality model, compared against itself: native 3‑channel mode vs 3 real + 1 synthetic as full 4‑channel input.        |
 | **RQ3** | Do traditional pixel-level quality metrics (PSNR, SSIM) correlate with and predict downstream segmentation performance (Dice, HD95)?          | Compute Pearson/Spearman correlation coefficients between (PSNR, SSIM) and (Dice, HD95) across all test cases and scenarios.           |
 
+
 > [!IMPORTANT]
 > **The generators are the subject of evaluation, not a contribution.** Segmentation models serve as measuring instruments — downstream, task‑based quality metrics for the synthetic modality. We are not benchmarking segmenters against each other, nor proposing new generative architectures.
 

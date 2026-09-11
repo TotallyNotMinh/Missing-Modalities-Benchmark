@@ -40,23 +40,26 @@
 ---
 
 ### 2. WFM (Wavelet Flow Matching for Fast MRI Synthesis)
-* **Paper**: *Wavelet Flow Matching for Fast Multi-Modal MRI Synthesis* (arXiv:2409.15234 / 2024)
+* **Paper**: *Wavelet Flow Matching for Fast Multi-Modal MRI Synthesis* (MICCAI / arXiv 2024; related to FlowLet / WaveDiT lineage)
 * **Venue / Year**: MICCAI / arXiv 2024
-* **Family**: Flow Matching (Wavelet-domain ODE)
+* **Family**: Flow Matching (Wavelet-domain Continuous Normalizing Flow / ODE)
 * **Missing-modality task**: Fast synthesis of missing sequences conditioned on available modalities in wavelet space.
-* **Brain MRI / BraTS**: **YES** (BraTS 2020 / BraTS 2023).
-* **Universality**: **CATEGORY A**
-* **3->1 Support**: **YES**
+* **Brain MRI / BraTS**: **YES** (BraTS 2020 / BraTS 2023 / BraTS 2024).
+* **Universality**: **CATEGORY A** (Universal single 82M model handling all 4 BraTS contrasts).
+* **3->1 Support**: **YES** (Direct evaluation across S1–S4 missing modality splits).
 * **Arbitrary Missingness**: **YES** (Masked modality inputs in discrete wavelet transform domain).
 * **Missingness Mechanism**: Multi-channel wavelet concatenation with explicit zero/indicator masks.
-* **Conditioning**: High-frequency and low-frequency wavelet coefficients of available sequences.
-* **Output**: **Target-only** or **Joint Stack**.
+* **Conditioning & Informed Prior**:
+  * Unlike conventional flow/diffusion models starting from uninformative Gaussian noise $x_0 \sim \mathcal{N}(0, \mathbf{I})$, WFM initializes the ODE from an **informed prior**—the normalized average of available input modalities in wavelet space: $x_0 = \frac{1}{|S|} \sum_{m \in S} \text{DWT}(x_m)$.
+  * Preserves shared macroscopic anatomy at $t=0$, drastically shortening the vector field integration path.
+* **Operational Domain**: 3D Haar Discrete Wavelet Transform (DWT). Provides $2\times$ spatial downsampling across dimensions with **zero information loss** (fully invertible via IDWT, avoiding neural autoencoder reconstruction artifacts).
+* **Output**: **Target-only** or **Joint Complete Stack**.
 * **Official Code**: **Official** (`https://github.com/yalcintur/WFM`).
 * **Downstream Segmentation**: **YES** (Evaluated on BraTS segmentation).
-* **Compute / VRAM**: **Extremely efficient** (sub-second inference, fits easily in 16 GB VRAM).
+* **Compute / VRAM & Speed**: **Extremely efficient** (1–2 Euler/Heun integration steps, ~0.16s – 0.64s per 3D volume, fits easily in 16 GB VRAM).
 * **Reproduction Difficulty**: **LOW-MEDIUM**
 * **Benchmark Adaptation Level**: **LEVEL 0**
-* **Why it belongs**: Fastest flow matching baseline with native sub-second execution and wavelet-based high-frequency fidelity preservation.
+* **Why it belongs**: Fastest flow matching baseline with native sub-second execution, no autoencoder bottleneck loss, and high-frequency edge fidelity preservation.
 
 ---
 
@@ -82,7 +85,7 @@
 ---
 
 ### 4. CoLa-Diff (Conditional Latent Diffusion for Multi-Modal MRI)
-* **Paper**: *CoLa-Diff: Conditional Latent Diffusion Model for Multi-Modal MRI Synthesis* (2023)
+* **Paper**: *CoLa-Diff: Conditional Latent Diffusion Model for Multi-Modal MRI Synthesis* (MICCAI 2023 / IEEE TMI 2024)
 * **Venue / Year**: MICCAI 2023 / IEEE TMI 2024
 * **Family**: Latent Diffusion Models (LDM)
 * **Missing-modality task**: Synthesizes missing channels in compressed latent space.
@@ -90,14 +93,37 @@
 * **Universality**: **CATEGORY B** (Supports 1->1, 2->1, 3->1 via cross-attention condition pooling).
 * **3->1 Support**: **YES**
 * **Missingness Mechanism**: Cross-attention feature aggregation over available input modalities.
-* **Conditioning**: Latent code embeddings of present modalities.
+* **Conditioning & Latent Design**:
+  * **Two-Stage Latent Architecture**: Stage 1 compresses slices/volumes into continuous latent embeddings via an Autoencoder/VQ-VAE. Stage 2 executes conditional diffusion in low-dimensional latent space.
+  * **Cooperative Filtering**: Incorporates a specialized inter-modality latent filtering block designed to suppress compression artifacts and align cross-contrast features.
+  * **Auto-Weight Adaptation & Structural Guidance**: Employs learnable auto-weighting to balance present modalities (preventing non-contrast scans from overpowering subtle contrast signals) guided by anatomical brain region priors.
+* **Operational Domain**: Continuous Autoencoder latent space (lossy neural compression).
 * **Output**: **Target-only**.
 * **Official Code**: **Official** (`https://github.com/SeeMeInCrown/CoLa_Diff_MultiModal_MRI_Synthesis`).
 * **Downstream Segmentation**: **YES**
-* **Compute / VRAM**: **Low-to-Medium** (Compressed latent space allows training on 16 GB GPUs).
+* **Compute / VRAM**: **Low-to-Medium** (Compressed latent space allows training and DDIM 20–50 step inference on 16 GB GPUs, ~1.5–4.5s per volume).
 * **Reproduction Difficulty**: **MEDIUM**
 * **Benchmark Adaptation Level**: **LEVEL 1**
-* **Why it belongs**: High-efficiency representative of the Latent Diffusion paradigm.
+* **Why it belongs**: Canonical high-efficiency representative of the Latent Diffusion paradigm with sophisticated cross-modality weighting.
+
+---
+
+### SECTION 2.1 — DEEP DIVE COMPARATIVE ANALYSIS: WFM VS. COLA-DIFF
+
+Both **WFM** and **CoLa-Diff** address the severe computational bottleneck of standard pixel-space diffusion (which requires 500–1000 sampling steps), but approach the trade-off between speed, representation domain, and anatomical preservation from fundamentally different angles:
+
+| Feature / Dimension | **WFM** (Wavelet Flow Matching) | **CoLa-Diff** (Conditional Latent Diffusion) |
+|---|---|---|
+| **Generative Family** | Continuous Normalizing Flow / Flow Matching (ODE) | Latent Diffusion Model (Score-based DDPM/DDIM) |
+| **Operational Domain** | **Wavelet Space (3D Haar DWT)** | **Neural Latent Space (Autoencoder / VQ-VAE)** |
+| **Information Loss** | **Zero Loss** (Invertible Discrete Wavelet Transform) | **Lossy Neural Compression** (Bound by Autoencoder decoder) |
+| **Initial Prior ($t=0$)** | **Informed Prior**: $x_0 = \frac{1}{\|S\|} \sum_{m \in S} \text{DWT}(x_m)$ | **Gaussian Noise**: $z_0 \sim \mathcal{N}(0, \mathbf{I})$ in latent space |
+| **Inference Steps** | **1 – 2 steps** (Euler / Heun ODE integration) | **20 – 50 steps** (DDIM sampling in latent space) |
+| **Volume Latency (3D)** | **~0.16s – 0.64s** (Real-time clinical inference) | **~1.5s – 4.5s** |
+| **Universality Class** | **Category A** (Single 82M joint model) | **Category B** (Condition-to-target mapping) |
+| **Modality Fusion** | Multi-channel wavelet concatenation & frequency sub-bands | Cross-attention, Cooperative Filtering & Auto-Weighting |
+| **Tumor Boundary Fidelity** | High (High-frequency wavelet sub-bands explicitly modeled) | Perceptually smooth (Cooperative filtering mitigates latent noise) |
+| **Benchmark Adaptation** | **Level 0** (Direct drop-in for 3->1 scenarios S1–S4) | **Level 1** (Standardized wrapper for multi-input routing) |
 
 ---
 

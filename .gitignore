@@ -220,3 +220,9 @@ __marimo__/
 # Agent
 .agents
 .ua
+
+# Data & Artifacts
+data/
+checkpoints/
+results/
+outputs/
