@@ -7,6 +7,7 @@ try:
         Compose as MonaiCompose,
         SpatialPadd,
         RandSpatialCropd,
+        RandCropByPosNegLabeld,
         RandFlipd,
         RandRotated,
         RandZoomd,
@@ -27,6 +28,18 @@ except ImportError:
 MODALITY_KEY = "modalities"
 MASK_KEY = "mask"
 ALL_KEYS = [MODALITY_KEY, MASK_KEY]
+
+
+class SingleSampleCompose:
+    """Wraps compose transforms to unwrap single-element lists returned by spatial sampling transforms."""
+    def __init__(self, compose_transform: Callable):
+        self.compose_transform = compose_transform
+
+    def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
+        out = self.compose_transform(sample)
+        if isinstance(out, (list, tuple)) and len(out) == 1:
+            return out[0]
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -292,9 +305,18 @@ def get_segmentation_train_transforms(
     rot_rad = max(abs(rot_range_deg[0]), abs(rot_range_deg[1])) * (np.pi / 180.0)
 
     if HAS_MONAI:
-        return MonaiCompose([
+        return SingleSampleCompose(MonaiCompose([
             SpatialPadd(keys=ALL_KEYS, spatial_size=patch_size, mode="constant"),
-            RandSpatialCropd(keys=ALL_KEYS, roi_size=patch_size, random_size=False),
+            RandCropByPosNegLabeld(
+                keys=ALL_KEYS,
+                label_key=MASK_KEY,
+                spatial_size=patch_size,
+                pos=1,
+                neg=2,
+                num_samples=1,
+                image_key=MODALITY_KEY,
+                image_threshold=0.0,
+            ),
             RandRotated(
                 keys=ALL_KEYS,
                 range_x=rot_rad,
@@ -338,7 +360,7 @@ def get_segmentation_train_transforms(
             RandSimulateLowResolutiond(keys=[MODALITY_KEY], zoom_range=low_res_zoom, prob=low_res_prob),
             EnsureTyped(keys=[MODALITY_KEY], dtype="float32"),
             EnsureTyped(keys=[MASK_KEY], dtype="int64"),
-        ])
+        ]))
     else:
         return PyTorchCompose([
             PyTorchSpatialPad(keys=ALL_KEYS, spatial_size=patch_size),
@@ -364,21 +386,19 @@ def get_val_transforms(
     Deterministic Validation and Test Transform Pipeline.
     
     Rationale:
-      Zero stochastic augmentations. Evaluates strictly on deterministic
-      center crops (128x128x128) to guarantee exact reproducibility of
-      evaluation metrics (Dice, HD95, PSNR, SSIM) across all models.
+      Zero stochastic augmentations. Preserves the full 3D volume (padded if
+      necessary so each dimension is at least patch_size) so that evaluation
+      runs full-volume sliding window inference matching official BraTS benchmarks.
     """
     if HAS_MONAI:
         return MonaiCompose([
             SpatialPadd(keys=ALL_KEYS, spatial_size=patch_size, mode="constant"),
-            CenterSpatialCropd(keys=ALL_KEYS, roi_size=patch_size),
             EnsureTyped(keys=[MODALITY_KEY], dtype="float32"),
             EnsureTyped(keys=[MASK_KEY], dtype="int64"),
         ])
     else:
         return PyTorchCompose([
             PyTorchSpatialPad(keys=ALL_KEYS, spatial_size=patch_size),
-            PyTorchSpatialCrop(keys=ALL_KEYS, roi_size=patch_size, mode="center"),
             PyTorchEnsureTyped(keys=[MODALITY_KEY], dtype="float32"),
             PyTorchEnsureTyped(keys=[MASK_KEY], dtype="int64"),
         ])

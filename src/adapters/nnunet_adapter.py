@@ -110,18 +110,36 @@ class nnUNetAdapter:
 
     def _build_default_network(self) -> nn.Module:
         """
-        Builds a standard 3D PlainConvUNet matching nnU-Net v2 architecture.
+        Builds a 3D PlainConvUNet matching the official nnU-Net v2 architecture.
+        For standard BraTS patch sizes (e.g. 128x128x128), this builds the full
+        6-stage backbone with feature channels (32, 64, 128, 256, 320, 320)
+        comprising ~31.2M parameters.
+        For smaller test patch sizes, stages are dynamically adapted so that
+        spatial downsampling remains valid.
         """
+        min_dim = min(self.patch_size) if hasattr(self, "patch_size") and self.patch_size else 128
+        stages = 1
+        curr = min_dim
+        while stages < 6 and curr >= 4:
+            curr //= 2
+            stages += 1
+        stages = max(3, stages)
+
+        BASE_FEATURES = (32, 64, 128, 256, 320, 320)
+        features = BASE_FEATURES[:stages]
+        strides = ((1, 1, 1),) + tuple((2, 2, 2) for _ in range(stages - 1))
+        kernel_sizes = tuple((3, 3, 3) for _ in range(stages))
+
         net = PlainConvUNet(
             input_channels=self.num_input_channels,
-            n_stages=4,
-            features_per_stage=(16, 32, 64, 128),
+            n_stages=stages,
+            features_per_stage=features,
             conv_op=nn.Conv3d,
-            kernel_sizes=((3, 3, 3), (3, 3, 3), (3, 3, 3), (3, 3, 3)),
-            strides=((1, 1, 1), (2, 2, 2), (2, 2, 2), (2, 2, 2)),
-            n_conv_per_stage=(2, 2, 2, 2),
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            n_conv_per_stage=tuple(2 for _ in range(stages)),
             num_classes=self.num_classes,
-            n_conv_per_stage_decoder=(2, 2, 2),
+            n_conv_per_stage_decoder=tuple(2 for _ in range(stages - 1)),
             conv_bias=True,
             norm_op=nn.InstanceNorm3d,
             norm_op_kwargs={"eps": 1e-5, "affine": True},
@@ -298,9 +316,11 @@ class nnUNetAdapter:
         self,
         batch: Dict[str, Any],
         voxel_spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0),
-    ) -> List[Dict[str, Any]]:
+        return_logits: bool = False,
+    ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], np.ndarray]]:
         """
         Evaluates a batch of samples from DataLoader and returns per-patient metrics.
+        If return_logits is True, also returns full predicted logits array of shape (B, num_classes, H, W, D).
         """
         inputs = batch.get("modalities", batch.get("inputs"))
         targets = batch.get("mask")
@@ -310,17 +330,27 @@ class nnUNetAdapter:
             targets = targets.squeeze(1)
 
         results = []
+        all_logits = []
         for i in range(len(inputs)):
             sample_in = inputs[i]
             sample_target = targets[i]
             pid = patient_ids[i] if isinstance(patient_ids, (list, tuple)) else str(patient_ids)
 
-            metrics = self.evaluate_sample(
-                input_data=sample_in,
+            if return_logits:
+                pred_mask, logits_np = self.predict(sample_in, return_logits=True)
+                all_logits.append(logits_np)
+            else:
+                pred_mask = self.predict(sample_in, return_logits=False)
+
+            metrics = compute_segmentation_metrics(
                 target_mask=sample_target,
+                pred_mask=pred_mask,
                 voxel_spacing=voxel_spacing,
             )
             record = {"patient_id": pid, **metrics}
             results.append(record)
 
+        if return_logits:
+            stacked_logits = np.stack(all_logits, axis=0) if len(all_logits) > 1 else np.expand_dims(all_logits[0], axis=0)
+            return results, stacked_logits
         return results

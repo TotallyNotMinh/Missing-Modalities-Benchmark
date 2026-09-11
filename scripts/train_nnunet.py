@@ -36,17 +36,19 @@ from src.utils.pipeline_utils import load_config, seed_everything
 def train_epoch(
     model: nn.Module,
     loader: torch.utils.data.DataLoader,
-    optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
+    optimizer: torch.optim.Optimizer,
     device: torch.device,
-    scaler: Optional[torch.cuda.amp.GradScaler] = None,
-    grad_clip: float = 1.0,
+    scaler: Optional[torch.amp.GradScaler] = None,
     use_amp: bool = True,
+    grad_clip: float = 1.0,
+    grad_accum: int = 1,
 ) -> float:
-    """Executes one training epoch and returns mean training loss."""
+    """Executes one training epoch with optional gradient accumulation and returns mean training loss."""
     model.train()
     running_loss = 0.0
     num_batches = 0
+    optimizer.zero_grad()
 
     for batch in tqdm(loader, desc="Training", leave=False):
         # Full 4-channel stack: (B, 4, H, W, D)
@@ -58,24 +60,27 @@ def train_epoch(
         target_mapped = targets.clone()
         target_mapped[target_mapped == 4] = 3
 
-        optimizer.zero_grad()
-
         with torch.amp.autocast("cuda", enabled=(use_amp and device.type == "cuda")):
             logits = model(inputs)
             loss = criterion(logits, target_mapped)
+            loss_for_backward = loss / max(1, grad_accum)
 
         if scaler is not None and use_amp and device.type == "cuda":
-            scaler.scale(loss).backward()
-            if grad_clip > 0:
-                scaler.unscale_(optimizer)
-                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            scaler.step(optimizer)
-            scaler.update()
+            scaler.scale(loss_for_backward).backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    scaler.unscale_(optimizer)
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
         else:
-            loss.backward()
-            if grad_clip > 0:
-                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            optimizer.step()
+            loss_for_backward.backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                optimizer.step()
+                optimizer.zero_grad()
 
         running_loss += loss.item()
         num_batches += 1
@@ -100,19 +105,17 @@ def evaluate_validation(
     all_hd95_mean = []
 
     for batch in tqdm(val_loader, desc="Validation", leave=False):
-        inputs = batch["modalities"].to(device, dtype=torch.float32)
         targets = batch["mask"].to(device, dtype=torch.long)
-
         target_mapped = targets.clone()
         target_mapped[target_mapped == 4] = 3
 
+        # Run sliding-window inference on full 3D volume, producing both metrics and logits
         with torch.amp.autocast("cuda", enabled=(use_amp and device.type == "cuda")):
-            logits = adapter.network(inputs)
-            loss = criterion(logits, target_mapped)
+            batch_results, logits_np = adapter.evaluate_batch(batch, return_logits=True)
+            logits_t = torch.from_numpy(logits_np).to(device)
+            loss = criterion(logits_t, target_mapped)
             val_losses.append(loss.item())
 
-        # Subregion segmentation metrics per patient
-        batch_results = adapter.evaluate_batch(batch)
         for r in batch_results:
             all_dice_wt.append(r["Dice_WT"])
             all_dice_tc.append(r["Dice_TC"])
@@ -145,6 +148,8 @@ def main():
     parser.add_argument("--device", default=None, help="Device to use ('cuda', 'cuda:0', 'cpu')")
     parser.add_argument("--val_interval", type=int, default=5, help="Validation frequency in epochs")
     parser.add_argument("--num_workers", type=int, default=None, help="DataLoader num_workers")
+    parser.add_argument("--optimizer", default=None, choices=["sgd", "adamw"], help="Optimizer ('sgd' for official nnU-Net standard, 'adamw')")
+    parser.add_argument("--grad_accum", type=int, default=1, help="Gradient accumulation steps")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume")
     args = parser.parse_args()
 
@@ -211,9 +216,24 @@ def main():
     model = adapter.network
 
     # 6. Loss, Optimizer, Scheduler, AMP Scaler
-    criterion = DiceCELoss(to_onehot_y=True, softmax=True)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=cfg.training.get("weight_decay", 1e-5))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    criterion = DiceCELoss(include_background=False, to_onehot_y=True, softmax=True)
+
+    opt_choice = (args.optimizer or cfg.training.get("optimizer", "sgd")).lower()
+    if opt_choice == "adamw":
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=cfg.training.get("weight_decay", 1e-5))
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    else:
+        # Default: SGD with Nesterov momentum and PolynomialLR (official nnU-Net standard)
+        sgd_lr = lr if args.lr is not None else cfg.training.get("lr_sgd", 0.01)
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=sgd_lr,
+            momentum=0.99,
+            weight_decay=3e-5,
+            nesterov=True,
+        )
+        scheduler = torch.optim.lr_scheduler.PolynomialLR(optimizer, total_iters=epochs, power=0.9)
+
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp) if use_amp else None
 
     # 7. Checkpoint & Logging (saves directly to checkpoints/oracle_nnunet)
@@ -252,6 +272,7 @@ def main():
             scaler=scaler,
             grad_clip=grad_clip,
             use_amp=use_amp,
+            grad_accum=args.grad_accum,
         )
         scheduler.step()
 

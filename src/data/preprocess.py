@@ -21,7 +21,13 @@ import numpy as np
 import SimpleITK as sitk
 from tqdm import tqdm
 
-from .scenarios import MODALITY_SUFFIXES
+try:
+    from .scenarios import MODALITY_SUFFIXES
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+    from src.data.scenarios import MODALITY_SUFFIXES
+
 SEG_SUFFIX = "seg"
 TARGET_SPACING = (1.0, 1.0, 1.0)  # mm³ isotropic
 
@@ -96,6 +102,7 @@ def preprocess_patient(
     patient_dir: Path,
     out_dir: Path,
     patient_id: str,
+    skip_n4: bool = True,
 ) -> None:
     """Full preprocessing pipeline for a single patient."""
     out_patient_dir = out_dir / patient_id
@@ -103,35 +110,38 @@ def preprocess_patient(
 
     seg_path = _resolve_raw_path(patient_dir, patient_id, SEG_SUFFIX)
 
-    # Process each modality — brain mask is derived per-modality AFTER resampling
-    # to guarantee shape consistency when volumes are not already at 1mm³.
-    for i, suffix in enumerate(MODALITY_SUFFIXES):
+    # Pass 1: Read all modalities and resample if needed
+    modality_imgs = []
+    modality_arrays = []
+    for suffix in MODALITY_SUFFIXES:
         in_path = _resolve_raw_path(patient_dir, patient_id, suffix)
-
-        # Step 1: Read as SimpleITK float32
         sitk_img = sitk.ReadImage(str(in_path), sitk.sitkFloat32)
 
-        # Step 2: N4 Bias Field Correction (uses non-zero brain mask to avoid background distortion)
-        mask_sitk = sitk.Cast(sitk_img > 0, sitk.sitkUInt8)
-        sitk_img = n4_bias_correction(sitk_img, mask_image=mask_sitk)
+        # Step 2: N4 Bias Field Correction (optional; skipped by default for BraTS which is already standardized)
+        if not skip_n4:
+            mask_sitk = sitk.Cast(sitk_img > 0, sitk.sitkUInt8)
+            sitk_img = n4_bias_correction(sitk_img, mask_image=mask_sitk)
 
         # Step 3: Resample to target spacing
         current_spacing = sitk_img.GetSpacing()
         if not all(abs(c - t) < 0.01 for c, t in zip(current_spacing, TARGET_SPACING)):
             sitk_img = resample_to_spacing(sitk_img, TARGET_SPACING, is_label=False)
 
-        # Step 4: Build brain mask from *resampled* T1 (first modality, index 0)
-        # Re-derive from the resampled T1 so that mask shape always matches arr.
         arr = sitk.GetArrayFromImage(sitk_img).astype(np.float32)
-        if i == 0:  # T1 — derive the brain mask at resampled resolution
-            brain_mask = (arr > 0).astype(np.uint8)
+        modality_imgs.append(sitk_img)
+        modality_arrays.append(arr)
 
-        # Step 5: Z-Score Normalization (uses brain_mask from resampled T1)
-        arr = zscore_normalize(arr, brain_mask)
+    # Union brain mask across all 4 modalities: prevents zeroing out valid tissue or lesions
+    union_mask = np.zeros_like(modality_arrays[0], dtype=bool)
+    for arr in modality_arrays:
+        union_mask |= (arr > 0)
+    union_mask = union_mask.astype(np.uint8)
 
-        # Step 6: Save to output
+    # Step 5: Normalize and save each modality
+    for i, suffix in enumerate(MODALITY_SUFFIXES):
+        arr = zscore_normalize(modality_arrays[i], union_mask)
         out_img = sitk.GetImageFromArray(arr)
-        out_img.CopyInformation(sitk_img)
+        out_img.CopyInformation(modality_imgs[i])
         out_path = out_patient_dir / f"{patient_id}_{suffix}.nii.gz"
         sitk.WriteImage(out_img, str(out_path))
 
@@ -143,18 +153,18 @@ def preprocess_patient(
 
 
 def _preprocess_worker(args_tuple):
-    patient_dir, out_path, patient_id = args_tuple
+    patient_dir, out_path, patient_id, skip_n4 = args_tuple
     out_patient_dir = out_path / patient_id
     if out_patient_dir.exists() and any(out_patient_dir.iterdir()):
         return patient_id, True, None  # Already preprocessed
     try:
-        preprocess_patient(patient_dir, out_path, patient_id)
+        preprocess_patient(patient_dir, out_path, patient_id, skip_n4=skip_n4)
         return patient_id, True, None
     except Exception as e:
         return patient_id, False, str(e)
 
 
-def run_preprocessing(raw_dir: str, out_dir: str, num_workers: int = 4) -> None:
+def run_preprocessing(raw_dir: str, out_dir: str, num_workers: int = 4, skip_n4: bool = True) -> None:
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
     raw_path = Path(raw_dir)
@@ -162,9 +172,9 @@ def run_preprocessing(raw_dir: str, out_dir: str, num_workers: int = 4) -> None:
     out_path.mkdir(parents=True, exist_ok=True)
 
     patient_dirs = sorted([p for p in raw_path.iterdir() if p.is_dir()])
-    print(f"[Preprocessing] Found {len(patient_dirs)} patients in {raw_path} (workers={num_workers})")
+    print(f"[Preprocessing] Found {len(patient_dirs)} patients in {raw_path} (workers={num_workers}, skip_n4={skip_n4})")
 
-    tasks = [(p, out_path, p.name) for p in patient_dirs]
+    tasks = [(p, out_path, p.name, skip_n4) for p in patient_dirs]
 
     if num_workers <= 1:
         for task in tqdm(tasks, desc="Preprocessing patients"):
@@ -187,5 +197,7 @@ if __name__ == "__main__":
     parser.add_argument("--raw_dir", default="data/raw/brats2020")
     parser.add_argument("--out_dir", default="data/processed")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of parallel worker processes")
+    parser.add_argument("--skip_n4", action="store_true", default=True, help="Skip N4 bias correction (BraTS is already skull-stripped/normalized)")
+    parser.add_argument("--run_n4", dest="skip_n4", action="store_false", help="Run N4 bias correction")
     args = parser.parse_args()
-    run_preprocessing(args.raw_dir, args.out_dir, num_workers=args.num_workers)
+    run_preprocessing(args.raw_dir, args.out_dir, num_workers=args.num_workers, skip_n4=args.skip_n4)

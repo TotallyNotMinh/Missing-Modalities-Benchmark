@@ -94,5 +94,7 @@ class BraTSDataset(torch.utils.data.Dataset):
 
         if self.transform is not None:
             sample = self.transform(sample)
+            if isinstance(sample, (list, tuple)) and len(sample) == 1:
+                sample = sample[0]
 
         return sample

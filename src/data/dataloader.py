@@ -40,13 +40,13 @@ class ScenarioDataset(BraTSDataset):
 
 def get_dataloaders(
     scenario: str,
-    processed_dir: str = "data/processed",
-    splits_file: str = "data/splits/splits.json",
-    patch_size: list = [128, 128, 128],
-    batch_size: int = 2,
-    num_workers: int = 4,
-    pin_memory: bool = True,
-    seed: int = 42,
+    processed_dir: Optional[str] = None,
+    splits_file: Optional[str] = None,
+    patch_size: Optional[list] = None,
+    batch_size: Optional[int] = None,
+    num_workers: Optional[int] = None,
+    pin_memory: Optional[bool] = None,
+    seed: Optional[int] = None,
     task: Literal["synthesis", "segmentation"] = "segmentation",
     train_transform: Optional[Callable] = None,
     eval_transform: Optional[Callable] = None,
@@ -68,28 +68,37 @@ def get_dataloaders(
     Args:
         scenario: Missing modality scenario ('S1', 'S2', 'S3', 'S4').
         processed_dir: Root of preprocessed patient volumes.
-        splits_file: Path to the frozen splits JSON.
-        patch_size: 3D patch size for cropping.
-        batch_size: Training batch size.
-        num_workers: DataLoader worker processes.
+        splits_file: Path to splits.json.
+        patch_size: 3D patch size for spatial cropping.
+        batch_size: DataLoader batch size.
+        num_workers: Subprocess workers for data loading.
         pin_memory: Pin memory for faster GPU transfer.
-        seed: Random seed (for reproducibility of worker init).
-        task: 'synthesis' uses conservative augmentation; 'segmentation' uses nnU-Net augmentation.
-        train_transform: Optional custom training transform (overrides task default).
-        eval_transform: Optional custom validation/testing transform (overrides default).
+        seed: Random seed for loader worker initialization.
+        task: 'segmentation' or 'synthesis'.
+        train_transform: Custom training transform.
+        eval_transform: Custom validation/test transform.
+        cfg: Optional dict/Config to read defaults from.
 
     Returns:
         (train_loader, val_loader, test_loader)
     """
-    # Override individual params from cfg if provided
+    # Resolve parameters: explicit argument > cfg > hardcoded default
     if cfg is not None:
-        processed_dir = cfg.get("paths", {}).get("processed_dir", processed_dir)
-        splits_file = cfg.get("paths", {}).get("splits_file", splits_file)
-        patch_size = cfg.get("patch", {}).get("size", patch_size)
-        batch_size = cfg.get("training", {}).get("batch_size", batch_size)
-        num_workers = cfg.get("num_workers", num_workers)
-        pin_memory = cfg.get("pin_memory", pin_memory)
-        seed = cfg.get("seed", seed)
+        processed_dir = processed_dir or cfg.get("paths", {}).get("processed_dir", "data/processed")
+        splits_file = splits_file or cfg.get("paths", {}).get("splits_file", "data/splits/splits.json")
+        patch_size = patch_size or cfg.get("patch", {}).get("size", [128, 128, 128])
+        batch_size = batch_size if batch_size is not None else cfg.get("training", {}).get("batch_size", 2)
+        num_workers = num_workers if num_workers is not None else cfg.get("num_workers", 4)
+        pin_memory = pin_memory if pin_memory is not None else cfg.get("pin_memory", True)
+        seed = seed if seed is not None else cfg.get("seed", 42)
+    else:
+        processed_dir = processed_dir or "data/processed"
+        splits_file = splits_file or "data/splits/splits.json"
+        patch_size = patch_size or [128, 128, 128]
+        batch_size = batch_size if batch_size is not None else 2
+        num_workers = num_workers if num_workers is not None else 4
+        pin_memory = pin_memory if pin_memory is not None else True
+        seed = seed if seed is not None else 42
 
     if scenario not in SCENARIOS:
         raise ValueError(f"Unknown scenario '{scenario}'. Choose from {list(SCENARIOS.keys())}.")
@@ -129,10 +138,12 @@ def get_dataloaders(
         transform=eval_transform,
     )
 
-    def make_loader(ds, shuffle):
+    eval_batch_size = 1 if task == "segmentation" else batch_size
+
+    def make_loader(ds, shuffle, bsz=batch_size):
         return DataLoader(
             ds,
-            batch_size=batch_size,
+            batch_size=bsz,
             shuffle=shuffle,
             num_workers=num_workers,
             pin_memory=pin_memory,
@@ -142,9 +153,9 @@ def get_dataloaders(
         )
 
     return (
-        make_loader(train_ds, shuffle=True),
-        make_loader(val_ds, shuffle=False),
-        make_loader(test_ds, shuffle=False),
+        make_loader(train_ds, shuffle=True, bsz=batch_size),
+        make_loader(val_ds, shuffle=False, bsz=eval_batch_size),
+        make_loader(test_ds, shuffle=False, bsz=eval_batch_size),
     )
 
 
