@@ -79,6 +79,19 @@ def zscore_normalize(volume: np.ndarray, brain_mask: np.ndarray) -> np.ndarray:
     return normalized.astype(np.float32)
 
 
+def _resolve_raw_path(patient_dir: Path, patient_id: str, suffix: str) -> Path:
+    """Finds either .nii.gz or .nii file for a given patient modality/mask."""
+    gz_path = patient_dir / f"{patient_id}_{suffix}.nii.gz"
+    if gz_path.exists():
+        return gz_path
+    nii_path = patient_dir / f"{patient_id}_{suffix}.nii"
+    if nii_path.exists():
+        return nii_path
+    raise FileNotFoundError(
+        f"Missing file for {patient_id} ({suffix}): neither .nii.gz nor .nii found in {patient_dir}"
+    )
+
+
 def preprocess_patient(
     patient_dir: Path,
     out_dir: Path,
@@ -88,14 +101,12 @@ def preprocess_patient(
     out_patient_dir = out_dir / patient_id
     out_patient_dir.mkdir(parents=True, exist_ok=True)
 
-    seg_path = patient_dir / f"{patient_id}_{SEG_SUFFIX}.nii.gz"
+    seg_path = _resolve_raw_path(patient_dir, patient_id, SEG_SUFFIX)
 
     # Process each modality — brain mask is derived per-modality AFTER resampling
     # to guarantee shape consistency when volumes are not already at 1mm³.
     for i, suffix in enumerate(MODALITY_SUFFIXES):
-        in_path = patient_dir / f"{patient_id}_{suffix}.nii.gz"
-        if not in_path.exists():
-            raise FileNotFoundError(f"Missing file: {in_path}")
+        in_path = _resolve_raw_path(patient_dir, patient_id, suffix)
 
         # Step 1: Read as SimpleITK float32
         sitk_img = sitk.ReadImage(str(in_path), sitk.sitkFloat32)
@@ -131,23 +142,42 @@ def preprocess_patient(
     sitk.WriteImage(seg_sitk, str(out_seg_path))
 
 
-def run_preprocessing(raw_dir: str, out_dir: str) -> None:
+def _preprocess_worker(args_tuple):
+    patient_dir, out_path, patient_id = args_tuple
+    out_patient_dir = out_path / patient_id
+    if out_patient_dir.exists() and any(out_patient_dir.iterdir()):
+        return patient_id, True, None  # Already preprocessed
+    try:
+        preprocess_patient(patient_dir, out_path, patient_id)
+        return patient_id, True, None
+    except Exception as e:
+        return patient_id, False, str(e)
+
+
+def run_preprocessing(raw_dir: str, out_dir: str, num_workers: int = 4) -> None:
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
     raw_path = Path(raw_dir)
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
     patient_dirs = sorted([p for p in raw_path.iterdir() if p.is_dir()])
-    print(f"[Preprocessing] Found {len(patient_dirs)} patients in {raw_path}")
+    print(f"[Preprocessing] Found {len(patient_dirs)} patients in {raw_path} (workers={num_workers})")
 
-    for patient_dir in tqdm(patient_dirs, desc="Preprocessing patients"):
-        patient_id = patient_dir.name
-        out_patient_dir = out_path / patient_id
-        if out_patient_dir.exists() and any(out_patient_dir.iterdir()):
-            continue  # Already preprocessed, skip
-        try:
-            preprocess_patient(patient_dir, out_path, patient_id)
-        except Exception as e:
-            print(f"[Preprocessing] ERROR on {patient_id}: {e}")
+    tasks = [(p, out_path, p.name) for p in patient_dirs]
+
+    if num_workers <= 1:
+        for task in tqdm(tasks, desc="Preprocessing patients"):
+            pid, ok, err = _preprocess_worker(task)
+            if not ok:
+                print(f"[Preprocessing] ERROR on {pid}: {err}")
+    else:
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = {executor.submit(_preprocess_worker, t): t[2] for t in tasks}
+            for fut in tqdm(as_completed(futures), total=len(tasks), desc="Preprocessing patients"):
+                pid, ok, err = fut.result()
+                if not ok:
+                    print(f"[Preprocessing] ERROR on {pid}: {err}")
 
     print(f"[Preprocessing] Done. Outputs in {out_path}")
 
@@ -156,5 +186,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BraTS 2020 Offline Preprocessing")
     parser.add_argument("--raw_dir", default="data/raw/brats2020")
     parser.add_argument("--out_dir", default="data/processed")
+    parser.add_argument("--num_workers", type=int, default=4, help="Number of parallel worker processes")
     args = parser.parse_args()
-    run_preprocessing(args.raw_dir, args.out_dir)
+    run_preprocessing(args.raw_dir, args.out_dir, num_workers=args.num_workers)
