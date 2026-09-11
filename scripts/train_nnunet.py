@@ -214,7 +214,7 @@ def main():
     criterion = DiceCELoss(to_onehot_y=True, softmax=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=cfg.training.get("weight_decay", 1e-5))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp) if use_amp else None
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp) if use_amp else None
 
     # 7. Checkpoint & Logging (saves directly to checkpoints/oracle_nnunet)
     checkpoint_mgr = CheckpointManager(
@@ -257,6 +257,12 @@ def main():
 
         print(f"Epoch [{epoch:03d}/{epochs:03d}] Loss: {train_loss:.4f} LR: {scheduler.get_last_lr()[0]:.6f}")
 
+        logger.log(
+            epoch=epoch,
+            phase="train",
+            metrics={"loss": train_loss},
+        )
+
         # Validation pass
         if epoch % val_interval == 0 or epoch == epochs:
             val_metrics = evaluate_validation(
@@ -289,20 +295,24 @@ def main():
             )
 
             # Logging
-            logger.log_epoch(
+            logger.log(
                 epoch=epoch,
                 phase="val",
-                loss=val_metrics["val_loss"],
-                dice_wt=val_metrics["dice_wt"],
-                dice_tc=val_metrics["dice_tc"],
-                dice_et=val_metrics["dice_et"],
-                dice_mean=current_dice,
-                hd95_mean=val_metrics["hd95_mean"],
+                metrics={
+                    "loss": val_metrics["val_loss"],
+                    "dice_wt": val_metrics["dice_wt"],
+                    "dice_tc": val_metrics["dice_tc"],
+                    "dice_et": val_metrics["dice_et"],
+                    "dice_mean": current_dice,
+                    "hd95_mean": val_metrics["hd95_mean"],
+                },
             )
 
             if early_stopping.step(current_dice):
                 print(f"[Training] Early stopping triggered at epoch {epoch}.")
                 break
+
+    logger.close()
 
     print(f"\n[Training] Complete! Best Val Dice: {best_dice:.4f}")
     print(f"[Training] Best weights saved at: {checkpoint_mgr.best_path}")
