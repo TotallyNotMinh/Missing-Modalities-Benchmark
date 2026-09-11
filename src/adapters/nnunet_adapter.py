@@ -68,12 +68,18 @@ class nnUNetAdapter:
         if network is not None:
             self.network = network.to(self.device)
             self.network.eval()
+            print(f"[nnUNetAdapter] Using supplied custom PyTorch network on {self.device}.")
         elif self.weights_path is not None and self._is_nnunet_folder(self.weights_path):
             self._init_official_predictor(self.weights_path)
         else:
             self.network = self._build_default_network()
             if self.weights_path is not None and self.weights_path.is_file():
                 self._load_state_dict(self.weights_path)
+                print(f"[nnUNetAdapter] Initialized 6-stage PlainConvUNet with weights loaded from '{self.weights_path}' on {self.device}.")
+            elif self.weights_path is not None and not self.weights_path.exists():
+                print(f"[nnUNetAdapter] Initialized primary 6-stage PlainConvUNet (31.2M params) for training on {self.device} (weights path '{self.weights_path}' does not exist yet).")
+            else:
+                print(f"[nnUNetAdapter] Initialized primary 6-stage PlainConvUNet (31.2M params) on {self.device}.")
             self.network.to(self.device)
             self.network.eval()
 
@@ -100,9 +106,10 @@ class nnUNetAdapter:
                 checkpoint_name="checkpoint_final.pth",
             )
             self.is_official_predictor = True
+            print(f"[nnUNetAdapter] Initialized official nnUNetPredictor from model folder '{model_folder}' on {self.device}.")
         except Exception as e:
-            print(f"[nnUNetAdapter] Warning: Could not initialize official nnUNetPredictor ({e}). "
-                  "Falling back to standalone PlainConvUNet.")
+            print(f"[nnUNetAdapter] [FALLBACK ACTIVATED] Could not initialize official nnUNetPredictor from '{model_folder}' ({e}). "
+                  f"Falling back to native 6-stage PlainConvUNet architecture on {self.device}.")
             self.network = self._build_default_network()
             self.network.to(self.device)
             self.network.eval()

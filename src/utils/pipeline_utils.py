@@ -111,8 +111,9 @@ def load_config(path: Path = CONFIG_PATH, model_name: Optional[str] = None) -> C
             with open(model_config_path, "r") as f:
                 model_cfg = yaml.safe_load(f)
             cfg_dict = _deep_merge(cfg_dict, model_cfg)
+            print(f"[Config] Loaded model-specific config: {model_config_path}")
         else:
-            print(f"[Config] Warning: No model config found at {model_config_path}")
+            print(f"[Config] Note: No specific overrides at {model_config_path}; using base config.")
 
     config = Config(cfg_dict)
     _set_nnunet_env_vars(config, project_root=project_root)

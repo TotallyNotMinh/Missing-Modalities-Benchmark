@@ -1,0 +1,31 @@
+# =============================================================================
+# nnU-Net Oracle Model Configuration
+# Architecture and training defaults matching official nnU-Net v2 3d_fullres
+# =============================================================================
+
+model:
+  name: "nnunet"
+  architecture: "PlainConvUNet"
+  num_stages: 6
+  features_per_stage: [32, 64, 128, 256, 320, 320]
+  kernel_sizes: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]
+  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
+  n_conv_per_stage: [2, 2, 2, 2, 2, 2]
+  n_conv_per_stage_decoder: [2, 2, 2, 2, 2]
+  conv_bias: true
+  norm_op: "InstanceNorm3d"
+  norm_op_kwargs:
+    eps: 1.0e-5
+    affine: true
+  nonlin: "LeakyReLU"
+  nonlin_kwargs:
+    inplace: true
+  deep_supervision: false
+
+training:
+  optimizer: "sgd"
+  lr_sgd: 0.01
+  momentum: 0.99
+  weight_decay: 3.0e-5
+  scheduler: "polynomial"
+  polynomial_power: 0.9

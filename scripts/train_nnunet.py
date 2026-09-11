@@ -157,11 +157,16 @@ def main():
     cfg = load_config(args.config, model_name="nnunet")
     seed_everything(cfg.seed)
 
-    # 2. Resolve hyperparams
     device_str = args.device or cfg.device
-    if device_str.startswith("cuda") and not torch.cuda.is_available():
-        print(f"[Training] CUDA not available, falling back to CPU.")
-        device_str = "cpu"
+    if device_str.startswith("cuda"):
+        if not torch.cuda.is_available():
+            print(f"[Training] [FALLBACK ACTIVATED] CUDA was requested ('{device_str}') but CUDA is not available. Falling back to CPU.")
+            device_str = "cpu"
+        else:
+            gpu_name = torch.cuda.get_device_name(0)
+            print(f"[Training] Accelerator: CUDA ({gpu_name})")
+    else:
+        print(f"[Training] Accelerator: CPU")
     device = torch.device(device_str)
 
     epochs = args.epochs or cfg.training.get("max_epochs", 100)
