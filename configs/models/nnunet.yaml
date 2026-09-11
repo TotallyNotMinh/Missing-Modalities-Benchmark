@@ -20,7 +20,8 @@ model:
   nonlin: "LeakyReLU"
   nonlin_kwargs:
     inplace: true
-  deep_supervision: false
+  num_classes: 3
+  deep_supervision: true
 
 training:
   optimizer: "sgd"
@@ -29,3 +30,7 @@ training:
   weight_decay: 3.0e-5
   scheduler: "polynomial"
   polynomial_power: 0.9
+  max_epochs: 1000
+  iterations_per_epoch: 250
+  batch_size: 2
+  loss: "dc_and_bce"

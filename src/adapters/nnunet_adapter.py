@@ -38,7 +38,8 @@ class nnUNetAdapter:
         device: Optional[Union[str, torch.device]] = None,
         patch_size: Tuple[int, int, int] = (128, 128, 128),
         num_input_channels: int = 4,
-        num_classes: int = 4,
+        num_classes: int = 3,
+        deep_supervision: bool = True,
         network: Optional[nn.Module] = None,
     ):
         """
@@ -47,7 +48,8 @@ class nnUNetAdapter:
             device: Device to run inference on ('cuda', 'cpu', or torch.device).
             patch_size: Default 3D patch ROI size for sliding-window evaluation.
             num_input_channels: Number of input MRI modalities (default 4: T1, T1ce, T2, FLAIR).
-            num_classes: Number of output classes (default 4: BG, NCR, ED, ET).
+            num_classes: Number of output classes (default 3: WT, TC, ET for region-based; or 4 for categorical).
+            deep_supervision: Whether multi-scale deep supervision is enabled in the network.
             network: Optional custom PyTorch nn.Module. If None, builds PlainConvUNet.
         """
         if device is None:
@@ -60,6 +62,7 @@ class nnUNetAdapter:
         self.patch_size = tuple(patch_size)
         self.num_input_channels = num_input_channels
         self.num_classes = num_classes
+        self.deep_supervision = deep_supervision
         self.weights_path = Path(weights_path) if weights_path is not None else None
 
         self.is_official_predictor = False
@@ -105,6 +108,9 @@ class nnUNetAdapter:
                 use_folds=None,
                 checkpoint_name="checkpoint_final.pth",
             )
+            self.network = self.predictor.network
+            self.network.to(self.device)
+            self.network.eval()
             self.is_official_predictor = True
             print(f"[nnUNetAdapter] Initialized official nnUNetPredictor from model folder '{model_folder}' on {self.device}.")
         except Exception as e:
@@ -154,7 +160,7 @@ class nnUNetAdapter:
             dropout_op_kwargs=None,
             nonlin=nn.LeakyReLU,
             nonlin_kwargs={"inplace": True},
-            deep_supervision=False,
+            deep_supervision=self.deep_supervision,
         )
         return net
 
@@ -193,13 +199,17 @@ class nnUNetAdapter:
         target_weights = weights_path or cfg.paths.get("oracle_weights", None)
         target_device = device or cfg.get("device", "cuda")
         target_patch = tuple(cfg.patch.get("size", (128, 128, 128)))
+        model_cfg = cfg.get("model", {})
+        target_classes = model_cfg.get("num_classes", 3)
+        target_ds = model_cfg.get("deep_supervision", True)
 
         return cls(
             weights_path=target_weights,
             device=target_device,
             patch_size=target_patch,
             num_input_channels=len(cfg.modalities.get("order", ["t1", "t1ce", "t2", "flair"])),
-            num_classes=4,
+            num_classes=target_classes,
+            deep_supervision=target_ds,
         )
 
     def _prepare_input_tensor(
@@ -272,21 +282,39 @@ class nnUNetAdapter:
         spatial_shape = x.shape[2:]
         needs_sliding_window = any(s > r for s, r in zip(spatial_shape, roi))
 
+        # Handle deep supervision output: extract full-resolution head (index 0)
+        has_ds = hasattr(self.network, "decoder") and getattr(self.network.decoder, "deep_supervision", False)
+        predictor_fn = (lambda inp: self.network(inp)[0]) if has_ds else self.network
+
         if needs_sliding_window:
             logits = sliding_window_inference(
                 inputs=x,
                 roi_size=roi,
                 sw_batch_size=1,
-                predictor=self.network,
+                predictor=predictor_fn,
                 overlap=overlap,
                 mode="gaussian",
             )
         else:
-            logits = self.network(x)
+            out = self.network(x)
+            logits = out[0] if isinstance(out, (list, tuple)) else out
 
-        # Map argmax class index (0, 1, 2, 3) -> standard BraTS label (0, 1, 2, 4)
-        pred_class = torch.argmax(logits, dim=1).cpu().numpy().astype(np.uint8)
-        pred_labels = self.CLASS_TO_BRATS_LABEL[pred_class]
+        if logits.shape[1] == 3:
+            # Region-based prediction (official nnU-Net BraTS standard)
+            # Channel 0: Whole Tumor (WT), 1: Tumor Core (TC), 2: Enhancing Tumor (ET)
+            probs = torch.sigmoid(logits)
+            wt = (probs[:, 0] > 0.5).cpu().numpy()
+            tc = (probs[:, 1] > 0.5).cpu().numpy()
+            et = (probs[:, 2] > 0.5).cpu().numpy()
+
+            pred_labels = np.zeros(wt.shape, dtype=np.uint8)
+            pred_labels[wt] = 2  # Edema
+            pred_labels[tc] = 1  # Necrosis / Non-enhancing
+            pred_labels[et] = 4  # Enhancing tumor
+        else:
+            # Categorical softmax fallback
+            pred_class = torch.argmax(logits, dim=1).cpu().numpy().astype(np.uint8)
+            pred_labels = self.CLASS_TO_BRATS_LABEL[pred_class]
 
         logits_np = logits.cpu().numpy()
 

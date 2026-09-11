@@ -18,7 +18,7 @@ def test_nnunet_adapter_init():
     adapter = nnUNetAdapter(device="cpu", patch_size=(32, 32, 32))
     assert adapter is not None
     assert adapter.num_input_channels == 4
-    assert adapter.num_classes == 4
+    assert adapter.num_classes == 3
     assert adapter.device.type == "cpu"
 
 
@@ -58,7 +58,7 @@ def test_nnunet_adapter_predict_logits():
     x = torch.randn(4, 32, 32, 32)
     pred, logits = adapter.predict(x, return_logits=True)
     assert pred.shape == (32, 32, 32)
-    assert logits.shape == (4, 32, 32, 32)
+    assert logits.shape == (3, 32, 32, 32)
 
 
 def test_nnunet_adapter_dict_input():
