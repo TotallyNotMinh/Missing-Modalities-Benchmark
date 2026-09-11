@@ -102,7 +102,12 @@ def prepare_dataset(raw_dir: Path, out_dir: Path, num_processes: int = 8) -> Non
         src_mask_gz = p / f"{case_id}_seg.nii.gz"
         src_mask = src_mask_nii if src_mask_nii.exists() else src_mask_gz
         if not src_mask.exists():
-            raise FileNotFoundError(f"Missing seg for patient {case_id}")
+            # Fallback for known BraTS 2020 anomaly (e.g. case 355 is named W39_1998.09.19_Segm.nii)
+            seg_candidates = [f for f in p.glob("*[sS]eg*.nii*") if not f.name.startswith(".")]
+            if seg_candidates:
+                src_mask = seg_candidates[0]
+            else:
+                raise FileNotFoundError(f"Missing seg for patient {case_id}")
         dst_mask = labels_tr / f"{case_id}{file_ending}"
         mask_tasks.append((src_mask.resolve(), dst_mask))
 
