@@ -236,6 +236,8 @@ def main():
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--grad_clip", type=float, default=1.0, help="Gradient clipping norm")
     parser.add_argument("--grad_accum", type=int, default=1, help="Gradient accumulation steps")
+    parser.add_argument("--data_dir", type=str, default=None, help="Override path to preprocessed data directory")
+    parser.add_argument("--splits_file", type=str, default=None, help="Override path to splits.json")
     parser.add_argument("--save_dir", type=str, default="checkpoints/mmformer", help="Directory to save checkpoints")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume")
     parser.add_argument("--smoke_test", action="store_true", help="Run quick 1-epoch smoke test and exit")
@@ -293,13 +295,14 @@ def main():
     print(f"============================================================")
 
     # 4. Resolve data splits
-    splits_file = Path(cfg.paths.splits_file)
+    data_dir = args.data_dir or cfg.paths.preprocessed_cache
+    splits_file = Path(args.splits_file or cfg.paths.splits_file)
     if not splits_file.exists():
         print(f"[Training] Splits file {splits_file} not found. Generating now...")
-        manager = SplitManager(processed_dir=cfg.paths.preprocessed_cache, splits_file=str(splits_file))
+        manager = SplitManager(processed_dir=data_dir, splits_file=str(splits_file))
         manager.generate()
 
-    split_mgr = SplitManager(processed_dir=cfg.paths.preprocessed_cache, splits_file=str(splits_file))
+    split_mgr = SplitManager(processed_dir=data_dir, splits_file=str(splits_file))
     train_ids = split_mgr.get_split("train")
     val_ids = split_mgr.get_split("val")
 
@@ -310,12 +313,12 @@ def main():
     val_transforms = get_val_transforms(cfg=cfg)
 
     train_dataset = BraTSDataset(
-        data_dir=cfg.paths.preprocessed_cache,
+        data_dir=data_dir,
         patient_ids=train_ids,
         transform=train_transforms,
     )
     val_dataset = BraTSDataset(
-        data_dir=cfg.paths.preprocessed_cache,
+        data_dir=data_dir,
         patient_ids=val_ids,
         transform=val_transforms,
     )
