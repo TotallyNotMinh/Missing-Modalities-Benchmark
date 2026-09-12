@@ -83,10 +83,12 @@ def train_one_epoch(
     grad_clip: float = 1.0,
     grad_accum: int = 1,
     max_iters: Optional[int] = None,
+    scaler: Optional[torch.amp.GradScaler] = None,
+    use_amp: bool = True,
 ) -> Dict[str, float]:
     """
-    Executes one training epoch of mmFormer with random combinatorial modality masking
-    and auxiliary multi-head losses.
+    Executes one training epoch of mmFormer with random combinatorial modality masking,
+    auxiliary multi-head losses, and optional automatic mixed precision (AMP).
     """
     model.train()
     model.is_training = True
@@ -123,45 +125,56 @@ def train_one_epoch(
         mask_indices = np.random.choice(15, size=b_size)
         masks = torch.from_numpy(COMBINATORIAL_MASKS[mask_indices]).to(device=device, dtype=torch.bool)
 
-        # 4. Model forward pass
-        fuse_pred, sep_preds, prm_preds = model(inputs, masks)
+        with torch.amp.autocast("cuda", enabled=(use_amp and device.type == "cuda")):
+            # 4. Model forward pass
+            fuse_pred, sep_preds, prm_preds = model(inputs, masks)
 
-        # 5. Losses
-        # Fused prediction loss
-        fuse_cross = criterions.softmax_weighted_loss(fuse_pred, target_one_hot, num_cls=4)
-        fuse_dice = criterions.dice_loss(fuse_pred, target_one_hot, num_cls=4)
-        fuse_loss = fuse_cross + fuse_dice
+            # 5. Losses
+            # Fused prediction loss
+            fuse_cross = criterions.softmax_weighted_loss(fuse_pred, target_one_hot, num_cls=4)
+            fuse_dice = criterions.dice_loss(fuse_pred, target_one_hot, num_cls=4)
+            fuse_loss = fuse_cross + fuse_dice
 
-        # Separate modality encoder auxiliary loss
-        sep_cross = torch.zeros(1, device=device, dtype=torch.float32)
-        sep_dice = torch.zeros(1, device=device, dtype=torch.float32)
-        for sep_pred in sep_preds:
-            sep_cross += criterions.softmax_weighted_loss(sep_pred, target_one_hot, num_cls=4)
-            sep_dice += criterions.dice_loss(sep_pred, target_one_hot, num_cls=4)
-        sep_loss = sep_cross + sep_dice
+            # Separate modality encoder auxiliary loss
+            sep_cross = torch.zeros(1, device=device, dtype=torch.float32)
+            sep_dice = torch.zeros(1, device=device, dtype=torch.float32)
+            for sep_pred in sep_preds:
+                sep_cross += criterions.softmax_weighted_loss(sep_pred, target_one_hot, num_cls=4)
+                sep_dice += criterions.dice_loss(sep_pred, target_one_hot, num_cls=4)
+            sep_loss = sep_cross + sep_dice
 
-        # Progressive region module deep supervision loss
-        prm_cross = torch.zeros(1, device=device, dtype=torch.float32)
-        prm_dice = torch.zeros(1, device=device, dtype=torch.float32)
-        for prm_pred in prm_preds:
-            prm_cross += criterions.softmax_weighted_loss(prm_pred, target_one_hot, num_cls=4)
-            prm_dice += criterions.dice_loss(prm_pred, target_one_hot, num_cls=4)
-        prm_loss = prm_cross + prm_dice
+            # Progressive region module deep supervision loss
+            prm_cross = torch.zeros(1, device=device, dtype=torch.float32)
+            prm_dice = torch.zeros(1, device=device, dtype=torch.float32)
+            for prm_pred in prm_preds:
+                prm_cross += criterions.softmax_weighted_loss(prm_pred, target_one_hot, num_cls=4)
+                prm_dice += criterions.dice_loss(prm_pred, target_one_hot, num_cls=4)
+            prm_loss = prm_cross + prm_dice
 
-        # Total combined loss
-        if epoch < region_fusion_start_epoch:
-            loss = sep_loss + prm_loss
+            # Total combined loss
+            if epoch < region_fusion_start_epoch:
+                loss = sep_loss + prm_loss
+            else:
+                loss = fuse_loss + sep_loss + prm_loss
+
+            loss_for_backward = loss / max(1, grad_accum)
+
+        if scaler is not None and use_amp and device.type == "cuda":
+            scaler.scale(loss_for_backward).backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    scaler.unscale_(optimizer)
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
         else:
-            loss = fuse_loss + sep_loss + prm_loss
-
-        loss_for_backward = loss / max(1, grad_accum)
-        loss_for_backward.backward()
-
-        if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
-            if grad_clip > 0:
-                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            optimizer.step()
-            optimizer.zero_grad()
+            loss_for_backward.backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                optimizer.step()
+                optimizer.zero_grad()
 
         total_loss_sum += loss.item()
         fuse_loss_sum += fuse_loss.item()
@@ -241,6 +254,7 @@ def main():
     parser.add_argument("--save_dir", type=str, default="checkpoints/mmformer", help="Directory to save checkpoints")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume")
     parser.add_argument("--smoke_test", action="store_true", help="Run quick 1-epoch smoke test and exit")
+    parser.add_argument("--no_amp", action="store_true", help="Disable automatic mixed precision (AMP)")
     args = parser.parse_args()
 
     # 1. Load config
@@ -273,7 +287,7 @@ def main():
     device = torch.device(device_str)
 
     # 3. Training hyper-parameters (Option A defaults)
-    epochs = 1 if args.smoke_test else (args.epochs or cfg.training.get("max_epochs", 1000))
+    epochs = 1 if args.smoke_test else (args.epochs or cfg.training.get("max_epochs", 300))
     batch_size = 1 if args.smoke_test else (args.batch_size or cfg.training.get("batch_size", 1))
     lr = args.lr or cfg.training.get("learning_rate", 2e-4)
     weight_decay = args.weight_decay or cfg.training.get("weight_decay", 1e-4)
@@ -281,6 +295,8 @@ def main():
     val_interval = 1 if args.smoke_test else args.val_interval
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
+    use_amp = (not args.no_amp) and cfg.get("amp", cfg.training.get("amp", True))
+    scaler = torch.amp.GradScaler("cuda", enabled=(use_amp and device.type == "cuda")) if device.type == "cuda" else None
 
     print(f"============================================================")
     print(f" Starting mmFormer Training (Option A: 36.65M Params)")
@@ -290,6 +306,7 @@ def main():
     print(f" Learning Rate : {lr}")
     print(f" Weight Decay  : {weight_decay}")
     print(f" Patch Size    : {patch_size}")
+    print(f" AMP (Mixed P) : {use_amp and device.type == 'cuda'}")
     print(f" Checkpoints   : {save_dir}")
     print(f" Smoke Test    : {args.smoke_test}")
     print(f"============================================================")
@@ -403,6 +420,8 @@ def main():
             grad_clip=args.grad_clip,
             grad_accum=args.grad_accum,
             max_iters=max_train_iters,
+            scaler=scaler,
+            use_amp=use_amp,
         )
 
         writer.add_scalar("train/loss", train_metrics["loss"], global_step=epoch + 1)

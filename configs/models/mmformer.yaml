@@ -25,7 +25,8 @@ training:
   amsgrad: true
   scheduler: "polynomial"
   polynomial_power: 0.9
-  max_epochs: 1000
+  max_epochs: 300
   batch_size: 1                   # 1 per GPU (prevents VRAM OOM on 24GB GPUs)
+  amp: true
   grad_clip: 1.0
   region_fusion_start_epoch: 0

@@ -45,7 +45,7 @@ class RFNetAdapter:
       2. Automated permutation to RFNet's internal ordering: (FLAIR, T1ce, T1, T2).
       3. Missing-modality mask construction: supports Scenario IDs ('S1'-'S4'),
          explicit boolean masks, or automatic non-zero channel detection.
-      4. Sliding-window 3D volumetric inference via MONAI (default patch size 80x80x80).
+      4. Sliding-window 3D volumetric inference via MONAI (default patch size 128x128x128).
       5. Label re-mapping to standard BraTS convention:
            0: Background
            1: Necrotic / Non-enhancing tumor (NCR/NET)
@@ -78,7 +78,7 @@ class RFNetAdapter:
         self,
         weights_path: Optional[Union[str, Path]] = None,
         device: Optional[Union[str, torch.device]] = None,
-        patch_size: Tuple[int, int, int] = (80, 80, 80),
+        patch_size: Tuple[int, int, int] = (128, 128, 128),
         num_classes: int = 4,
         network: Optional[nn.Module] = None,
     ):
@@ -86,7 +86,7 @@ class RFNetAdapter:
         Args:
             weights_path: Path to checkpoint (.pth/.pt) trained weights.
             device: Device to run inference on ('cuda', 'cpu', or torch.device).
-            patch_size: 3D patch ROI size for sliding-window evaluation (default: (80, 80, 80)).
+            patch_size: 3D patch ROI size for sliding-window evaluation (default: (128, 128, 128)).
             num_classes: Number of output classes (default: 4 for BG, NCR, ED, ET).
             network: Optional pre-instantiated PyTorch nn.Module. If None, builds RFNet Model.
         """
@@ -182,7 +182,7 @@ class RFNetAdapter:
             or cfg.paths.get("segmentation_weights", None)
         )
         target_device = device or cfg.get("device", "cuda")
-        target_patch = tuple(cfg.patch.get("size", (80, 80, 80)))
+        target_patch = tuple(cfg.patch.get("size", (128, 128, 128)))
         model_cfg = cfg.get("model", {})
         target_classes = model_cfg.get("num_classes", 4)
 

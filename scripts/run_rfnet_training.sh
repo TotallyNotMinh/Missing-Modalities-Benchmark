@@ -2,8 +2,9 @@
 set -e
 
 # ==============================================================================
-# mmFormer Baseline Training Pipeline for BraTS 2020
-# Architecture: Option A (36.65M parameters, basic_dims=8)
+# RFNet Baseline Training Pipeline for BraTS 2020
+# Architecture: RFNet (8.98M parameters, basic_dims=16)
+# Standardized patch size: 128x128x128
 # Target GPU  : Physical GPU 2 (CUDA_VISIBLE_DEVICES=2)
 # ==============================================================================
 
@@ -22,8 +23,6 @@ elif [ -n "${CONDA_PREFIX}" ] && [ -f "${CONDA_PREFIX}/bin/python" ]; then
 else
     PYTHON_BIN="python"
 fi
-
-
 
 # 2. Argument parsing: --gpu/-g, --smoke-test/-s, and passthrough flags
 TARGET_GPU="${CUDA_VISIBLE_DEVICES:-2}"
@@ -51,31 +50,31 @@ export CUDA_VISIBLE_DEVICES="${TARGET_GPU}"
 
 if [[ -n "${SMOKE_TEST_FLAG}" ]]; then
     echo "================================================================="
-    echo " Running mmFormer Pre-Flight Smoke Test (1 Epoch, 3 Batches)"
+    echo " Running RFNet Pre-Flight Smoke Test (1 Epoch, 2 Batches)"
     echo " Target GPU ID : ${TARGET_GPU} (CUDA_VISIBLE_DEVICES=${TARGET_GPU})"
     echo "================================================================="
 else
     echo "================================================================="
-    echo " Launching Official mmFormer 300-Epoch Training Run (with AMP)"
+    echo " Launching Official RFNet 300-Epoch Training Run"
     echo " Target GPU ID : ${TARGET_GPU} (CUDA_VISIBLE_DEVICES=${TARGET_GPU})"
     echo " Batch Size    : 1"
-    echo " Learning Rate : 2e-4"
-    echo " Checkpoints   : checkpoints/mmformer"
-    echo " Log File      : results/logs/mmformer_training.log"
+    echo " Patch Size    : 128x128x128"
+    echo " Learning Rate : 1e-4"
+    echo " Checkpoints   : checkpoints/rfnet"
+    echo " Log File      : results/logs/rfnet_training.log"
     echo "================================================================="
 fi
 
-mkdir -p results/logs checkpoints/mmformer
+mkdir -p results/logs checkpoints/rfnet
 
-"${PYTHON_BIN}" scripts/train_mmformer.py \
+"${PYTHON_BIN}" scripts/train_rfnet.py \
     --device "cuda:0" \
     --epochs 300 \
     --batch_size 1 \
-    --lr 2e-4 \
-    --weight_decay 1e-4 \
-    --val_interval 20 \
+    --lr 1e-4 \
+    --patch_size 128 128 128 \
+    --val_interval 5 \
     --num_workers 4 \
-    --save_dir checkpoints/mmformer \
+    --save_dir checkpoints/rfnet \
     ${SMOKE_TEST_FLAG} \
-    "${PASSTHROUGH_ARGS[@]}" 2>&1 | tee -a results/logs/mmformer_training.log
-
+    "${PASSTHROUGH_ARGS[@]}" 2>&1 | tee -a results/logs/rfnet_training.log

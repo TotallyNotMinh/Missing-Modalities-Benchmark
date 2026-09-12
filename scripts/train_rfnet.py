@@ -83,10 +83,12 @@ def train_one_epoch(
     grad_clip: float = 1.0,
     grad_accum: int = 1,
     max_iters: Optional[int] = None,
+    scaler: Optional[torch.amp.GradScaler] = None,
+    use_amp: bool = True,
 ) -> Dict[str, float]:
     """
-    Executes one training epoch of RFNet with random combinatorial modality masking
-    and auxiliary multi-head losses.
+    Executes one training epoch of RFNet with random combinatorial modality masking,
+    auxiliary multi-head losses, and optional automatic mixed precision (AMP).
     """
     model.train()
     if hasattr(model, "module"):
@@ -126,45 +128,56 @@ def train_one_epoch(
         mask_indices = np.random.choice(15, size=b_size)
         masks = torch.from_numpy(COMBINATORIAL_MASKS[mask_indices]).to(device=device, dtype=torch.bool)
 
-        # 4. Model forward pass
-        fuse_pred, sep_preds, prm_preds = model(inputs, masks)
+        with torch.amp.autocast("cuda", enabled=(use_amp and device.type == "cuda")):
+            # 4. Model forward pass
+            fuse_pred, sep_preds, prm_preds = model(inputs, masks)
 
-        # 5. Losses
-        # Fused prediction loss
-        fuse_cross = criterions.softmax_weighted_loss(fuse_pred, target_one_hot, num_cls=4)
-        fuse_dice = criterions.dice_loss(fuse_pred, target_one_hot, num_cls=4)
-        fuse_loss = fuse_cross + fuse_dice
+            # 5. Losses
+            # Fused prediction loss
+            fuse_cross = criterions.softmax_weighted_loss(fuse_pred, target_one_hot, num_cls=4)
+            fuse_dice = criterions.dice_loss(fuse_pred, target_one_hot, num_cls=4)
+            fuse_loss = fuse_cross + fuse_dice
 
-        # Separate modality encoder auxiliary loss
-        sep_cross = torch.zeros(1, device=device, dtype=torch.float32)
-        sep_dice = torch.zeros(1, device=device, dtype=torch.float32)
-        for sep_pred in sep_preds:
-            sep_cross += criterions.softmax_weighted_loss(sep_pred, target_one_hot, num_cls=4)
-            sep_dice += criterions.dice_loss(sep_pred, target_one_hot, num_cls=4)
-        sep_loss = sep_cross + sep_dice
+            # Separate modality encoder auxiliary loss
+            sep_cross = torch.zeros(1, device=device, dtype=torch.float32)
+            sep_dice = torch.zeros(1, device=device, dtype=torch.float32)
+            for sep_pred in sep_preds:
+                sep_cross += criterions.softmax_weighted_loss(sep_pred, target_one_hot, num_cls=4)
+                sep_dice += criterions.dice_loss(sep_pred, target_one_hot, num_cls=4)
+            sep_loss = sep_cross + sep_dice
 
-        # Progressive region module deep supervision loss
-        prm_cross = torch.zeros(1, device=device, dtype=torch.float32)
-        prm_dice = torch.zeros(1, device=device, dtype=torch.float32)
-        for prm_pred in prm_preds:
-            prm_cross += criterions.softmax_weighted_loss(prm_pred, target_one_hot, num_cls=4)
-            prm_dice += criterions.dice_loss(prm_pred, target_one_hot, num_cls=4)
-        prm_loss = prm_cross + prm_dice
+            # Progressive region module deep supervision loss
+            prm_cross = torch.zeros(1, device=device, dtype=torch.float32)
+            prm_dice = torch.zeros(1, device=device, dtype=torch.float32)
+            for prm_pred in prm_preds:
+                prm_cross += criterions.softmax_weighted_loss(prm_pred, target_one_hot, num_cls=4)
+                prm_dice += criterions.dice_loss(prm_pred, target_one_hot, num_cls=4)
+            prm_loss = prm_cross + prm_dice
 
-        # Total combined loss
-        if epoch < region_fusion_start_epoch:
-            loss = sep_loss + prm_loss
+            # Total combined loss
+            if epoch < region_fusion_start_epoch:
+                loss = sep_loss + prm_loss
+            else:
+                loss = fuse_loss + sep_loss + prm_loss
+
+            loss_for_backward = loss / max(1, grad_accum)
+
+        if scaler is not None and use_amp and device.type == "cuda":
+            scaler.scale(loss_for_backward).backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    scaler.unscale_(optimizer)
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
         else:
-            loss = fuse_loss + sep_loss + prm_loss
-
-        loss_for_backward = loss / max(1, grad_accum)
-        loss_for_backward.backward()
-
-        if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
-            if grad_clip > 0:
-                nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            optimizer.step()
-            optimizer.zero_grad()
+            loss_for_backward.backward()
+            if (num_batches + 1) % grad_accum == 0 or (num_batches + 1) == len(loader):
+                if grad_clip > 0:
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                optimizer.step()
+                optimizer.zero_grad()
 
         total_loss_sum += loss.item()
         fuse_loss_sum += fuse_loss.item()
@@ -247,13 +260,13 @@ def evaluate_validation(
 def parse_args():
     parser = argparse.ArgumentParser(description="RFNet Baseline Training on BraTS 2020")
     parser.add_argument("--config", type=str, default="configs/models/rfnet.yaml", help="Path to rfnet.yaml config")
-    parser.add_argument("--data_dir", type=str, default="data/processed", help="Path to preprocessed BraTS data")
-    parser.add_argument("--splits_file", type=str, default="data/splits/splits.json", help="Path to splits.json")
+    parser.add_argument("--data_dir", type=str, default=None, help="Path to preprocessed BraTS data")
+    parser.add_argument("--splits_file", type=str, default=None, help="Path to splits.json")
     parser.add_argument("--save_dir", type=str, default="checkpoints/rfnet", help="Directory to save checkpoints")
     parser.add_argument("--epochs", type=int, default=None, help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Batch size per GPU")
     parser.add_argument("--lr", type=float, default=None, help="Initial learning rate")
-    parser.add_argument("--patch_size", type=int, nargs=3, default=[80, 80, 80], help="Training crop patch size")
+    parser.add_argument("--patch_size", type=int, nargs=3, default=[128, 128, 128], help="Training crop patch size")
     parser.add_argument("--grad_accum", type=int, default=1, help="Gradient accumulation steps")
     parser.add_argument("--grad_clip", type=float, default=1.0, help="Gradient clipping norm")
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers")
@@ -262,6 +275,7 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
     parser.add_argument("--smoke_test", action="store_true", help="Run 1 epoch with 2 iterations for quick sanity check")
+    parser.add_argument("--no_amp", action="store_true", help="Disable automatic mixed precision (AMP)")
     return parser.parse_args()
 
 
@@ -277,6 +291,8 @@ def main():
     patch_size = tuple(args.patch_size)
     device = torch.device(args.device)
     val_interval = 1 if args.smoke_test else args.val_interval
+    use_amp = (not args.no_amp) and (cfg.get("amp", cfg.training.get("amp", True)) if cfg else True)
+    scaler = torch.amp.GradScaler("cuda", enabled=(use_amp and device.type == "cuda")) if device.type == "cuda" else None
 
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -291,7 +307,15 @@ def main():
     print(f"============================================================")
 
     # 1. Dataset & DataLoaders
-    split_mgr = SplitManager(splits_file=args.splits_file)
+    data_dir = args.data_dir or (cfg.paths.preprocessed_cache if cfg else "data/processed")
+    splits_file = Path(args.splits_file or (cfg.paths.splits_file if cfg else "data/splits/splits.json"))
+
+    if not splits_file.exists():
+        print(f"[RFNet] Splits file {splits_file} not found. Generating now...")
+        manager = SplitManager(processed_dir=data_dir, splits_file=str(splits_file))
+        manager.generate()
+
+    split_mgr = SplitManager(processed_dir=data_dir, splits_file=str(splits_file))
     train_ids = split_mgr.get_split("train")
     val_ids = split_mgr.get_split("val")
 
@@ -303,8 +327,8 @@ def main():
     train_transforms = get_segmentation_train_transforms(patch_size=patch_size)
     val_transforms = get_val_transforms()
 
-    train_ds = BraTSDataset(data_dir=args.data_dir, patient_ids=train_ids, transform=train_transforms)
-    val_ds = BraTSDataset(data_dir=args.data_dir, patient_ids=val_ids, transform=val_transforms)
+    train_ds = BraTSDataset(data_dir=data_dir, patient_ids=train_ids, transform=train_transforms)
+    val_ds = BraTSDataset(data_dir=data_dir, patient_ids=val_ids, transform=val_transforms)
 
     worker_init = partial(worker_init_fn, seed=args.seed)
     train_loader = DataLoader(
@@ -377,6 +401,8 @@ def main():
             grad_clip=args.grad_clip,
             grad_accum=args.grad_accum,
             max_iters=max_train_iters,
+            scaler=scaler,
+            use_amp=use_amp,
         )
 
         scheduler.step()

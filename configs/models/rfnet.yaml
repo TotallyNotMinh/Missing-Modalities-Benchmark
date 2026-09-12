@@ -21,5 +21,6 @@ training:
   polynomial_power: 0.9
   max_epochs: 300
   batch_size: 1                  # 1 per GPU
+  patch_size: [128, 128, 128]    # Standardized 128^3 patch matching benchmark
   grad_clip: 1.0
   region_fusion_start_epoch: 100 # In official RFNet, region fusion activates at epoch 100
