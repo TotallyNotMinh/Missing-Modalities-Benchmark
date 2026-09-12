@@ -132,6 +132,21 @@ def test_mmformer_adapter_dict_input():
     assert pred.shape == (32, 32, 32)
 
 
+def test_mmformer_adapter_raw_3channel_tensor_with_scenario():
+    """Verify raw 3-channel tensor is correctly expanded to 4 channels with mask='S1'."""
+    dummy = DummyMMFormer(num_cls=4)
+    adapter = MMFormerAdapter(device="cpu", patch_size=(16, 16, 16), network=dummy)
+    x_3c = torch.randn(3, 16, 16, 16)
+    pred = adapter.predict(x_3c, mask="S1")
+    assert pred.shape == (16, 16, 16)
+
+    # Test multi-missing scenario 'two_missing' (2 channels available)
+    x_2c = torch.randn(2, 16, 16, 16)
+    pred_2c = adapter.predict(x_2c, mask="two_missing")
+    assert pred_2c.shape == (16, 16, 16)
+
+
+
 def test_mmformer_adapter_evaluate_sample():
     dummy = DummyMMFormer(num_cls=4)
     adapter = MMFormerAdapter(device="cpu", patch_size=(32, 32, 32), network=dummy)

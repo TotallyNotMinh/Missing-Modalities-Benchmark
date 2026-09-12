@@ -43,14 +43,16 @@ class MMFormerAdapter:
     # to mmFormer ordering [FLAIR (3), T1ce (1), T1 (0), T2 (2)]
     BENCHMARK_TO_MMFORMER_INDICES = [3, 1, 0, 2]
 
-    # Scenario missing modality definitions in benchmark order [T1, T1ce, T2, FLAIR]
-    # False indicates the missing sequence
     SCENARIO_MASKS = {
-        "S1": [True, True, True, False],   # Missing FLAIR
-        "S2": [True, False, True, True],   # Missing T1ce
-        "S3": [False, True, True, True],   # Missing T1
-        "S4": [True, True, False, True],   # Missing T2
-        "FULL": [True, True, True, True],  # All 4 modalities
+        "S1": [True, True, True, False],                   # Missing FLAIR
+        "S2": [True, False, True, True],                   # Missing T1ce
+        "S3": [False, True, True, True],                   # Missing T1
+        "S4": [True, True, False, True],                   # Missing T2
+        "FULL": [True, True, True, True],                  # All 4 modalities
+        "SINGLE_MISSING_FLAIR": [True, True, True, False], # Alias for S1
+        "SINGLE_MISSING_T1CE": [True, False, True, True],  # Alias for S2
+        "TWO_MISSING": [True, False, True, False],         # Missing T1ce and FLAIR
+        "THREE_MISSING": [True, False, False, False],      # Missing T1ce, T2, and FLAIR
     }
 
     def __init__(
@@ -133,7 +135,11 @@ class MMFormerAdapter:
             (k[7:] if k.startswith("module.") else k): v
             for k, v in state_dict.items()
         }
-        self.network.load_state_dict(clean_state_dict, strict=False)
+        missing_keys, unexpected_keys = self.network.load_state_dict(clean_state_dict, strict=False)
+        if missing_keys:
+            print(f"[MMFormerAdapter] Warning: {len(missing_keys)} missing keys during checkpoint load (sample: {missing_keys[:3]})")
+        if unexpected_keys:
+            print(f"[MMFormerAdapter] Warning: {len(unexpected_keys)} unexpected keys during checkpoint load (sample: {unexpected_keys[:3]})")
 
     @classmethod
     def from_config(
@@ -166,6 +172,7 @@ class MMFormerAdapter:
     def _prepare_input_tensor(
         self,
         input_data: Union[np.ndarray, torch.Tensor, Dict[str, Any]],
+        mask: Optional[Union[str, Sequence[bool], np.ndarray, torch.Tensor]] = None,
     ) -> Tuple[torch.Tensor, bool, Optional[Union[str, List[bool], torch.Tensor]]]:
         """
         Converts input data into a 5D PyTorch Tensor (B, 4, H, W, D) in benchmark order.
@@ -205,16 +212,17 @@ class MMFormerAdapter:
                 f"Expected 4D (4, H, W, D) or 5D (B, 4, H, W, D) tensor, got {tensor.shape}"
             )
 
-        if tensor.shape[1] == 3 and dict_mask is not None and str(dict_mask).upper() in self.SCENARIO_MASKS:
-            # Automatically reconstruct (B, 4, H, W, D) by placing zeros in missing channel position
-            scenario_key = str(dict_mask).upper()
+        active_mask = mask if mask is not None else dict_mask
+        if active_mask is not None and isinstance(active_mask, str) and active_mask.upper() in self.SCENARIO_MASKS:
+            # Automatically reconstruct (B, 4, H, W, D) by placing available channels at their true positions
+            scenario_key = active_mask.upper()
             target_mask_bools = self.SCENARIO_MASKS[scenario_key]
-            missing_c = target_mask_bools.index(False)
-            reconstructed = torch.zeros((tensor.shape[0], 4, *tensor.shape[2:]), dtype=tensor.dtype)
-            avail_c = [c for c in range(4) if c != missing_c]
-            for in_i, out_i in enumerate(avail_c):
-                reconstructed[:, out_i] = tensor[:, in_i]
-            tensor = reconstructed
+            avail_indices = [idx for idx, b in enumerate(target_mask_bools) if b]
+            if tensor.shape[1] == len(avail_indices) and tensor.shape[1] < self.num_input_channels:
+                reconstructed = torch.zeros((tensor.shape[0], 4, *tensor.shape[2:]), dtype=tensor.dtype, device=tensor.device)
+                for in_i, out_i in enumerate(avail_indices):
+                    reconstructed[:, out_i] = tensor[:, in_i]
+                tensor = reconstructed
         elif tensor.shape[1] != self.num_input_channels:
             raise ValueError(
                 f"Expected {self.num_input_channels} input channels (T1, T1ce, T2, FLAIR), got {tensor.shape[1]}"
@@ -320,7 +328,7 @@ class MMFormerAdapter:
             pred_labels: uint8 ndarray of shape (H, W, D) or (B, H, W, D) with standard BraTS labels (0, 1, 2, 4).
             logits (optional): float32 ndarray of raw class logits of shape (4, H, W, D) or (B, 4, H, W, D).
         """
-        x_bench, was_4d, dict_mask = self._prepare_input_tensor(input_data)
+        x_bench, was_4d, dict_mask = self._prepare_input_tensor(input_data, mask=mask)
         active_mask = mask if mask is not None else dict_mask
 
         # Resolve boolean presence mask aligned with mmFormer order [FLAIR, T1ce, T1, T2]

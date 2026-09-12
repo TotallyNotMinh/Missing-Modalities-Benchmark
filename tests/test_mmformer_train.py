@@ -78,3 +78,56 @@ def test_one_hot_target_encoding():
 
     assert one_hot.shape == (1, 4, 2, 2)
     assert (one_hot.sum(dim=1) == 1.0).all()
+
+
+class MockTrainMMFormer(nn.Module):
+    def __init__(self, num_cls=4):
+        super().__init__()
+        self.conv = nn.Conv3d(4, num_cls, kernel_size=1)
+        self.is_training = True
+
+    def forward(self, x, mask):
+        B = x.shape[0]
+        mask_exp = mask.view(B, 4, 1, 1, 1).float()
+        x_m = x * mask_exp
+        logits = self.conv(x_m)
+        pred = torch.softmax(logits, dim=1)
+        sep_preds = [pred, pred, pred, pred]
+        prm_preds = [pred, pred, pred, pred]
+        return pred, sep_preds, prm_preds
+
+
+def test_train_one_epoch_execution():
+    """Verify train_one_epoch runs forward, backward, and optimizer steps cleanly."""
+    device = torch.device("cpu")
+    model = MockTrainMMFormer(num_cls=4).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    batch_data = [
+        {
+            "modalities": torch.randn(4, 8, 8, 8),
+            "mask": torch.randint(0, 3, (1, 8, 8, 8), dtype=torch.long),
+        }
+        for _ in range(2)
+    ]
+    batch_data[0]["mask"][0, 2:4, 2:4, 2:4] = 4
+
+    loader = DataLoader(batch_data, batch_size=1, shuffle=False)
+
+    metrics = train_one_epoch(
+        model=model,
+        loader=loader,
+        optimizer=optimizer,
+        device=device,
+        epoch=0,
+        grad_clip=1.0,
+        grad_accum=1,
+    )
+
+    assert "loss" in metrics
+    assert "fuse_loss" in metrics
+    assert "sep_loss" in metrics
+    assert "prm_loss" in metrics
+    assert not np.isnan(metrics["loss"])
+    assert metrics["loss"] > 0
+

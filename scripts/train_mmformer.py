@@ -39,12 +39,14 @@ from tqdm import tqdm
 import mmformer
 from utils import criterions
 
+from functools import partial
+
 from src.adapters.mmformer_adapter import MMFormerAdapter
 from src.data.brats_dataset import BraTSDataset
 from src.data.splits import SplitManager
 from src.data.augmentation import get_segmentation_train_transforms, get_val_transforms
 from src.metrics.segmentation import compute_segmentation_metrics
-from src.utils.pipeline_utils import load_config, seed_everything
+from src.utils.pipeline_utils import load_config, seed_everything, worker_init_fn
 
 
 # 15 combinatorial masks of [FLAIR, T1ce, T1, T2]
@@ -245,7 +247,11 @@ def main():
 
     # 2. Resolve device
     if args.gpu is not None:
-        device_str = f"cuda:{args.gpu}"
+        if torch.cuda.is_available() and torch.cuda.device_count() == 1 and args.gpu > 0:
+            print(f"[Training] Note: Single GPU visible (device_count=1). Mapping --gpu {args.gpu} to cuda:0.")
+            device_str = "cuda:0"
+        else:
+            device_str = f"cuda:{args.gpu}"
     else:
         device_str = args.device or cfg.device
 
@@ -319,6 +325,7 @@ def main():
         batch_size=batch_size,
         shuffle=True,
         num_workers=(0 if args.smoke_test else args.num_workers),
+        worker_init_fn=partial(worker_init_fn, base_seed=cfg.seed),
         pin_memory=(device.type == "cuda"),
         drop_last=True,
     )
@@ -462,6 +469,9 @@ def main():
                 )
                 print(f"[Validation] New best model saved to {best_ckpt_path} with Mean Dice: {best_dice:.4f}")
 
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+
         # Periodic checkpoint
         if (epoch + 1) % 50 == 0:
             periodic_path = save_dir / f"model_epoch_{epoch+1}.pth"
@@ -475,6 +485,7 @@ def main():
                 periodic_path,
             )
 
+    writer.close()
     total_time_hours = (time.time() - start_time) / 3600.0
     print(f"============================================================")
     if args.smoke_test:
