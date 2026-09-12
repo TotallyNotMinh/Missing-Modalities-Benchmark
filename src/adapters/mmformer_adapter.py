@@ -205,7 +205,17 @@ class MMFormerAdapter:
                 f"Expected 4D (4, H, W, D) or 5D (B, 4, H, W, D) tensor, got {tensor.shape}"
             )
 
-        if tensor.shape[1] != self.num_input_channels:
+        if tensor.shape[1] == 3 and dict_mask is not None and str(dict_mask).upper() in self.SCENARIO_MASKS:
+            # Automatically reconstruct (B, 4, H, W, D) by placing zeros in missing channel position
+            scenario_key = str(dict_mask).upper()
+            target_mask_bools = self.SCENARIO_MASKS[scenario_key]
+            missing_c = target_mask_bools.index(False)
+            reconstructed = torch.zeros((tensor.shape[0], 4, *tensor.shape[2:]), dtype=tensor.dtype)
+            avail_c = [c for c in range(4) if c != missing_c]
+            for in_i, out_i in enumerate(avail_c):
+                reconstructed[:, out_i] = tensor[:, in_i]
+            tensor = reconstructed
+        elif tensor.shape[1] != self.num_input_channels:
             raise ValueError(
                 f"Expected {self.num_input_channels} input channels (T1, T1ce, T2, FLAIR), got {tensor.shape[1]}"
             )
@@ -405,6 +415,7 @@ class MMFormerAdapter:
     def evaluate_batch(
         self,
         batch: Dict[str, Any],
+        scenario: Optional[str] = None,
         voxel_spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0),
         return_logits: bool = False,
         postprocess_et: bool = False,
@@ -417,7 +428,7 @@ class MMFormerAdapter:
         inputs = batch.get("modalities", batch.get("inputs"))
         targets = batch.get("mask")
         patient_ids = batch.get("patient_id", [f"patient_{i}" for i in range(len(inputs))])
-        batch_mask = batch.get("missing_mask", batch.get("scenario", None))
+        batch_mask = scenario if scenario is not None else batch.get("missing_mask", batch.get("scenario", None))
 
         if isinstance(targets, torch.Tensor) and targets.dim() == 5 and targets.shape[1] == 1:
             targets = targets.squeeze(1)
