@@ -1,0 +1,31 @@
+# =============================================================================
+# mmFormer Baseline Model Configuration
+# Architecture and training defaults matching official mmFormer (MICCAI 2022)
+# Option A: 36.65M parameter official repository configuration
+# =============================================================================
+
+model:
+  name: "mmformer"
+  architecture: "mmformer"
+  basic_dims: 8                   # Option A: 36.65M parameter official repository configuration
+  transformer_basic_dims: 512
+  mlp_dim: 4096
+  num_heads: 8
+  depth: 1
+  num_modals: 4
+  patch_size: 8
+  num_classes: 4                  # 0: BG, 1: NCR, 2: ED, 3: ET (mapped from BraTS 0, 1, 2, 4)
+
+training:
+  optimizer: "adam"
+  learning_rate: 2.0e-4
+  weight_decay: 1.0e-4
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  amsgrad: true
+  scheduler: "polynomial"
+  polynomial_power: 0.9
+  max_epochs: 1000
+  batch_size: 1                   # 1 per GPU (prevents VRAM OOM on 24GB GPUs)
+  grad_clip: 1.0
+  region_fusion_start_epoch: 0
