@@ -228,6 +228,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=None, help="Override batch size")
     parser.add_argument("--lr", type=float, default=None, help="Override learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="Adam weight decay")
+    parser.add_argument("--gpu", type=int, default=None, help="Physical GPU index to use (e.g. 0, 1, 2)")
     parser.add_argument("--device", default=None, help="Device to use ('cuda', 'cuda:0', 'cpu')")
     parser.add_argument("--val_interval", type=int, default=20, help="Validation frequency (epochs)")
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers")
@@ -243,14 +244,22 @@ def main():
     seed_everything(cfg.seed)
 
     # 2. Resolve device
-    device_str = args.device or cfg.device
+    if args.gpu is not None:
+        device_str = f"cuda:{args.gpu}"
+    else:
+        device_str = args.device or cfg.device
+
     if device_str.startswith("cuda"):
         if not torch.cuda.is_available():
             print(f"[Training] CUDA requested ('{device_str}') but not available. Falling back to CPU.")
             device_str = "cpu"
         else:
-            gpu_name = torch.cuda.get_device_name(0)
-            print(f"[Training] Accelerator: CUDA ({gpu_name})")
+            try:
+                gpu_idx = int(device_str.split(":")[1]) if ":" in device_str else 0
+                gpu_name = torch.cuda.get_device_name(gpu_idx)
+                print(f"[Training] Accelerator: CUDA ({gpu_name}) on device {device_str}")
+            except Exception:
+                print(f"[Training] Accelerator: CUDA on device {device_str}")
     else:
         print(f"[Training] Accelerator: CPU")
     device = torch.device(device_str)
