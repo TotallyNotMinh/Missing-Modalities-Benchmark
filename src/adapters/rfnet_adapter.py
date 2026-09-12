@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from src.metrics.segmentation import compute_segmentation_metrics
 from src.utils.pipeline_utils import Config, load_config
 
-MMFORMER_ROOT = Path(__file__).resolve().parent.parent.parent / "externals" / "mmformer" / "mmformer"
+RFNET_ROOT = Path(__file__).resolve().parent.parent.parent / "externals" / "rfnet"
 
 
 @contextmanager
@@ -22,7 +22,7 @@ def _scoped_import(root_path: Path):
     str_path = str(root_path.resolve())
     old_sys_path = list(sys.path)
     saved_modules = {}
-    for mod_name in ("layers", "models", "mmformer"):
+    for mod_name in ("layers", "models", "rfnet"):
         if mod_name in sys.modules:
             saved_modules[mod_name] = sys.modules.pop(mod_name)
     try:
@@ -30,37 +30,37 @@ def _scoped_import(root_path: Path):
         yield
     finally:
         sys.path = old_sys_path
-        for mod_name in ("layers", "models", "mmformer"):
+        for mod_name in ("layers", "models", "rfnet"):
             sys.modules.pop(mod_name, None)
             if mod_name in saved_modules:
                 sys.modules[mod_name] = saved_modules[mod_name]
 
 
-class MMFormerAdapter:
+class RFNetAdapter:
     """
-    Adapter for mmFormer downstream missing-modality segmentation evaluator.
+    Adapter for Region-Aware Fusion Network (RFNet) downstream missing-modality segmentation evaluator.
 
     Handles:
       1. Canonical 4-channel BraTS input ordering: (T1, T1ce, T2, FLAIR).
-      2. Automated permutation to mmFormer's internal ordering: (FLAIR, T1ce, T1, T2).
+      2. Automated permutation to RFNet's internal ordering: (FLAIR, T1ce, T1, T2).
       3. Missing-modality mask construction: supports Scenario IDs ('S1'-'S4'),
          explicit boolean masks, or automatic non-zero channel detection.
-      4. Sliding-window 3D volumetric inference via MONAI.
+      4. Sliding-window 3D volumetric inference via MONAI (default patch size 80x80x80).
       5. Label re-mapping to standard BraTS convention:
            0: Background
            1: Necrotic / Non-enhancing tumor (NCR/NET)
            2: Peritumoral edema (ED)
-           4: Enhancing tumor (ET)\
+           4: Enhancing tumor (ET)
       6. Subregion metric computation (WT, TC, ET Dice and HD95).
     """
 
-    # Mapping from mmFormer class index (0, 1, 2, 3) to standard BraTS label (0, 1, 2, 4)
+    # Mapping from RFNet class index (0, 1, 2, 3) to standard BraTS label (0, 1, 2, 4)
     # 0: BG, 1: NCR/NET, 2: ED, 3: ET -> mapped to BraTS 0, 1, 2, 4
     CLASS_TO_BRATS_LABEL = np.array([0, 1, 2, 4], dtype=np.uint8)
 
     # Permutation from benchmark ordering [T1 (0), T1ce (1), T2 (2), FLAIR (3)]
-    # to mmFormer ordering [FLAIR (3), T1ce (1), T1 (0), T2 (2)]
-    BENCHMARK_TO_MMFORMER_INDICES = [3, 1, 0, 2]
+    # to RFNet ordering [FLAIR (3), T1ce (1), T1 (0), T2 (2)]
+    BENCHMARK_TO_RFNET_INDICES = [3, 1, 0, 2]
 
     SCENARIO_MASKS = {
         "S1": [True, True, True, False],                   # Missing FLAIR
@@ -78,7 +78,7 @@ class MMFormerAdapter:
         self,
         weights_path: Optional[Union[str, Path]] = None,
         device: Optional[Union[str, torch.device]] = None,
-        patch_size: Tuple[int, int, int] = (128, 128, 128),
+        patch_size: Tuple[int, int, int] = (80, 80, 80),
         num_classes: int = 4,
         network: Optional[nn.Module] = None,
     ):
@@ -86,9 +86,9 @@ class MMFormerAdapter:
         Args:
             weights_path: Path to checkpoint (.pth/.pt) trained weights.
             device: Device to run inference on ('cuda', 'cpu', or torch.device).
-            patch_size: 3D patch ROI size for sliding-window evaluation (default: (128, 128, 128)).
+            patch_size: 3D patch ROI size for sliding-window evaluation (default: (80, 80, 80)).
             num_classes: Number of output classes (default: 4 for BG, NCR, ED, ET).
-            network: Optional pre-instantiated PyTorch nn.Module. If None, builds mmFormer Model.
+            network: Optional pre-instantiated PyTorch nn.Module. If None, builds RFNet Model.
         """
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,32 +106,36 @@ class MMFormerAdapter:
             self.network = network.to(self.device)
             if self.weights_path is not None and self.weights_path.is_file():
                 self._load_state_dict(self.weights_path)
-                print(f"[MMFormerAdapter] Loaded weights into supplied network from '{self.weights_path}' on {self.device}.")
+                print(f"[RFNetAdapter] Loaded weights into supplied network from '{self.weights_path}' on {self.device}.")
             else:
-                print(f"[MMFormerAdapter] Using supplied custom PyTorch network on {self.device}.")
+                print(f"[RFNetAdapter] Using supplied custom PyTorch network on {self.device}.")
+            if hasattr(self.network, "is_training"):
+                self.network.is_training = False
             self.network.eval()
         else:
             self.network = self._build_model()
             if self.weights_path is not None and self.weights_path.is_file():
                 self._load_state_dict(self.weights_path)
-                print(f"[MMFormerAdapter] Loaded weights from '{self.weights_path}' on {self.device}.")
+                print(f"[RFNetAdapter] Loaded weights from '{self.weights_path}' on {self.device}.")
             elif self.weights_path is not None and not self.weights_path.exists():
-                print(f"[MMFormerAdapter] Initialized mmFormer Model on {self.device} (weights path '{self.weights_path}' does not exist yet).")
+                print(f"[RFNetAdapter] Initialized RFNet Model on {self.device} (weights path '{self.weights_path}' does not exist yet).")
             else:
-                print(f"[MMFormerAdapter] Initialized mmFormer Model on {self.device} with fresh weights.")
+                print(f"[RFNetAdapter] Initialized RFNet Model on {self.device} with fresh weights.")
             self.network.to(self.device)
+            if hasattr(self.network, "is_training"):
+                self.network.is_training = False
             self.network.eval()
 
     def _build_model(self) -> nn.Module:
-        """Dynamically imports and constructs the mmFormer Model architecture."""
+        """Dynamically imports and constructs the RFNet Model architecture."""
         try:
-            with _scoped_import(MMFORMER_ROOT):
-                import mmformer
-                model = mmformer.Model(num_cls=self.num_classes)
+            with _scoped_import(RFNET_ROOT):
+                import models
+                model = models.Model(num_cls=self.num_classes)
                 return model
         except Exception as e:
             raise ImportError(
-                f"[MMFormerAdapter] Could not import or build mmformer.Model from {MMFORMER_ROOT}: {e}"
+                f"[RFNetAdapter] Could not import or build RFNet Model from {RFNET_ROOT}: {e}"
             )
 
     def _load_state_dict(self, checkpoint_path: Path) -> None:
@@ -157,9 +161,9 @@ class MMFormerAdapter:
         }
         missing_keys, unexpected_keys = self.network.load_state_dict(clean_state_dict, strict=False)
         if missing_keys:
-            print(f"[MMFormerAdapter] Warning: {len(missing_keys)} missing keys during checkpoint load (sample: {missing_keys[:3]})")
+            print(f"[RFNetAdapter] Warning: {len(missing_keys)} missing keys during checkpoint load (sample: {missing_keys[:3]})")
         if unexpected_keys:
-            print(f"[MMFormerAdapter] Warning: {len(unexpected_keys)} unexpected keys during checkpoint load (sample: {unexpected_keys[:3]})")
+            print(f"[RFNetAdapter] Warning: {len(unexpected_keys)} unexpected keys during checkpoint load (sample: {unexpected_keys[:3]})")
 
     @classmethod
     def from_config(
@@ -167,18 +171,18 @@ class MMFormerAdapter:
         cfg: Optional[Config] = None,
         weights_path: Optional[Union[str, Path]] = None,
         device: Optional[str] = None,
-    ) -> "MMFormerAdapter":
+    ) -> "RFNetAdapter":
         """Factory constructor instantiating adapter from project Config."""
         if cfg is None:
             cfg = load_config()
 
         target_weights = (
             weights_path
-            or cfg.paths.get("mmformer_weights", None)
+            or cfg.paths.get("rfnet_weights", None)
             or cfg.paths.get("segmentation_weights", None)
         )
         target_device = device or cfg.get("device", "cuda")
-        target_patch = tuple(cfg.patch.get("size", (128, 128, 128)))
+        target_patch = tuple(cfg.patch.get("size", (80, 80, 80)))
         model_cfg = cfg.get("model", {})
         target_classes = model_cfg.get("num_classes", 4)
 
@@ -257,7 +261,7 @@ class MMFormerAdapter:
     ) -> torch.Tensor:
         """
         Resolves the missing-modality mask into a boolean Tensor of shape (B, 4)
-        aligned with mmFormer's internal modality order: [FLAIR, T1ce, T1, T2].
+        aligned with RFNet's internal modality order: [FLAIR, T1ce, T1, T2].
 
         Args:
             x_bench: (B, 4, H, W, D) tensor in benchmark order [T1, T1ce, T2, FLAIR].
@@ -274,9 +278,9 @@ class MMFormerAdapter:
                 bench_bools = self.SCENARIO_MASKS[scenario_key]
             else:
                 raise ValueError(f"Unknown scenario '{mask}'. Expected one of {list(self.SCENARIO_MASKS.keys())}")
-            # Map benchmark order [T1, T1ce, T2, FLAIR] -> mmFormer [FLAIR, T1ce, T1, T2]
-            mm_bools = [bench_bools[i] for i in self.BENCHMARK_TO_MMFORMER_INDICES]
-            return torch.tensor([mm_bools] * B, dtype=torch.bool, device=self.device)
+            # Map benchmark order [T1, T1ce, T2, FLAIR] -> RFNet [FLAIR, T1ce, T1, T2]
+            rf_bools = [bench_bools[i] for i in self.BENCHMARK_TO_RFNET_INDICES]
+            return torch.tensor([rf_bools] * B, dtype=torch.bool, device=self.device)
 
         elif mask is not None:
             if isinstance(mask, (list, tuple)):
@@ -300,8 +304,8 @@ class MMFormerAdapter:
             else:
                 raise ValueError(f"Mask tensor must be 1D or 2D, got shape {mask_t.shape}")
 
-            # Reorder from benchmark order [T1, T1ce, T2, FLAIR] to mmFormer order [FLAIR, T1ce, T1, T2]
-            return mask_t[:, self.BENCHMARK_TO_MMFORMER_INDICES]
+            # Reorder from benchmark order [T1, T1ce, T2, FLAIR] to RFNet order [FLAIR, T1ce, T1, T2]
+            return mask_t[:, self.BENCHMARK_TO_RFNET_INDICES]
 
         else:
             # Auto-detect missing modalities: any channel that is all zeros is marked False
@@ -316,8 +320,8 @@ class MMFormerAdapter:
             all_zero = (bench_mask.sum(dim=1) == 0)
             bench_mask[all_zero] = True
 
-            # Permute to mmFormer order
-            return bench_mask[:, self.BENCHMARK_TO_MMFORMER_INDICES]
+            # Permute to RFNet order
+            return bench_mask[:, self.BENCHMARK_TO_RFNET_INDICES]
 
     @torch.no_grad()
     def predict(
@@ -332,17 +336,17 @@ class MMFormerAdapter:
         et_threshold: int = 500,
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
-        Runs 3D volumetric segmentation inference using mmFormer.
+        Runs 3D volumetric segmentation inference using RFNet.
 
         Args:
             input_data: (4, H, W, D) or (B, 4, H, W, D) volume or sample dict.
             mask: Optional missing-modality indicator ('S1'-'S4', boolean list, or tensor).
             return_logits: If True, returns (pred_mask, logits).
-            roi_size: Sliding window patch size. Defaults to self.patch_size (128, 128, 128).
+            roi_size: Sliding window patch size. Defaults to self.patch_size (80, 80, 80).
             overlap: Sliding window patch overlap ratio (0.0 - 1.0).
             blend_mode: Sliding window blending mode ('gaussian' or 'constant').
             postprocess_et: If True, applies official paper post-processing (zeros out ET if < et_threshold).
-            et_threshold: Voxel threshold for ET post-processing (default: 500, matching paper).
+            et_threshold: Voxel threshold for ET post-processing (default: 500).
 
         Returns:
             pred_labels: uint8 ndarray of shape (H, W, D) or (B, H, W, D) with standard BraTS labels (0, 1, 2, 4).
@@ -351,14 +355,14 @@ class MMFormerAdapter:
         x_bench, was_4d, dict_mask = self._prepare_input_tensor(input_data, mask=mask)
         active_mask = mask if mask is not None else dict_mask
 
-        # Resolve boolean presence mask aligned with mmFormer order [FLAIR, T1ce, T1, T2]
-        mask_mm = self._resolve_mask(x_bench, active_mask)
+        # Resolve boolean presence mask aligned with RFNet order [FLAIR, T1ce, T1, T2]
+        mask_rf = self._resolve_mask(x_bench, active_mask)
 
-        # Permute input channels: benchmark [T1, T1ce, T2, FLAIR] -> mmFormer [FLAIR, T1ce, T1, T2]
-        x_mm = x_bench[:, self.BENCHMARK_TO_MMFORMER_INDICES, :, :, :]
+        # Permute input channels: benchmark [T1, T1ce, T2, FLAIR] -> RFNet [FLAIR, T1ce, T1, T2]
+        x_rf = x_bench[:, self.BENCHMARK_TO_RFNET_INDICES, :, :, :]
 
         roi = roi_size or self.patch_size
-        spatial_shape = x_mm.shape[2:]
+        spatial_shape = x_rf.shape[2:]
         needs_sliding_window = any(s > r for s, r in zip(spatial_shape, roi))
 
         # Ensure network is in evaluation mode
@@ -369,13 +373,13 @@ class MMFormerAdapter:
         # Predictor closure for sliding-window inference
         def predictor_fn(patch: torch.Tensor) -> torch.Tensor:
             b_sw = patch.shape[0]
-            curr_mask = mask_mm if mask_mm.shape[0] == b_sw else mask_mm[:1].repeat(b_sw, 1)
+            curr_mask = mask_rf if mask_rf.shape[0] == b_sw else mask_rf[:1].repeat(b_sw, 1)
             out = self.network(patch, curr_mask)
             return out[0] if isinstance(out, (list, tuple)) else out
 
         if needs_sliding_window:
             logits = sliding_window_inference(
-                inputs=x_mm,
+                inputs=x_rf,
                 roi_size=roi,
                 sw_batch_size=1,
                 predictor=predictor_fn,
@@ -383,7 +387,7 @@ class MMFormerAdapter:
                 mode=blend_mode,
             )
         else:
-            out = self.network(x_mm, mask_mm)
+            out = self.network(x_rf, mask_rf)
             logits = out[0] if isinstance(out, (list, tuple)) else out
 
         # Convert logits to standard BraTS categorical labels (0, 1, 2, 4)

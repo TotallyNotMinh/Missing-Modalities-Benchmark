@@ -1,0 +1,25 @@
+# =============================================================================
+# RFNet Baseline Model Configuration
+# Architecture and training defaults matching official RFNet (MICCAI 2021)
+# =============================================================================
+
+model:
+  name: "rfnet"
+  architecture: "rfnet"
+  basic_dims: 16                  # Official RFNet basic_dims = 16 (~8.98M parameters)
+  num_modals: 4
+  num_classes: 4                 # 0: BG, 1: NCR, 2: ED, 3: ET (mapped from BraTS 0, 1, 2, 4)
+
+training:
+  optimizer: "adam"
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  amsgrad: true
+  scheduler: "polynomial"
+  polynomial_power: 0.9
+  max_epochs: 300
+  batch_size: 1                  # 1 per GPU
+  grad_clip: 1.0
+  region_fusion_start_epoch: 100 # In official RFNet, region fusion activates at epoch 100
