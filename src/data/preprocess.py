@@ -155,7 +155,11 @@ def preprocess_patient(
 def _preprocess_worker(args_tuple):
     patient_dir, out_path, patient_id, skip_n4 = args_tuple
     out_patient_dir = out_path / patient_id
-    if out_patient_dir.exists() and any(out_patient_dir.iterdir()):
+    expected_files = [
+        out_patient_dir / f"{patient_id}_{suffix}.nii.gz"
+        for suffix in (*MODALITY_SUFFIXES, SEG_SUFFIX)
+    ]
+    if out_patient_dir.exists() and all(f.exists() for f in expected_files):
         return patient_id, True, None  # Already preprocessed
     try:
         preprocess_patient(patient_dir, out_path, patient_id, skip_n4=skip_n4)
