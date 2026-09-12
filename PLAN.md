@@ -94,11 +94,11 @@ The segmentation model is a **frozen downstream evaluator**. It is not being tra
 
 | Model                 | Architecture                       | Why this evaluator                                                                                                                           |
 | --------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **nnU‑Net v2** | Self‑configuring 3D U‑Net (CNN)  | Gold‑standard medical segmentation. Official BraTS 2020 weights → fully reproducible, no retraining.                                       |
+| **nnU‑Net v2** | Self‑configuring 3D U‑Net (CNN) via `nnunetv2` | Gold‑standard medical segmentation using official nnU-Net v2 (`dynamic_network_architectures` 3D fullres). Trained & validated on standardized `splits.json` (Validation Mean Dice: 85.02% \| WT: 92.34%, TC: 85.76%, ET: 76.95%). |
 | **SwinUNETR**   | Swin‑Transformer + U‑Net decoder | Transformer‑based evaluator. If both CNN and Transformer respond similarly to the synthetic modality, the result is architecture‑agnostic. |
 
 > [!NOTE]
-> **Why two evaluators?** If nnU‑Net shows a small Dice drop but SwinUNETR shows a large one (or vice versa), the quality of the synthetic modality is architecture‑dependent — a finding worth reporting. If both agree, the conclusion is robust.
+> **Why two evaluators?** If nnU‑Net v2 shows a small Dice drop but SwinUNETR shows a large one (or vice versa), the quality of the synthetic modality is architecture‑dependent — a finding worth reporting. If both agree, the conclusion is robust.
 
 #### Conditions (per evaluator, per scenario)
 
@@ -258,7 +258,7 @@ We stratify downstream segmentation errors (Dice drop) by:
 | ΔDice < 1 % for 3D‑MedDiff but > 3 % for Pix2Pix                | Generator quality is decisive. GAN synthesis is insufficient; diffusion is necessary.                          |
 | ΔDice > 3 % for both generators                                  | Current generators are not good enough. The gap is too large to call synthesis a viable substitute.            |
 | ΔDice varies by scenario (e.g., small for FLAIR, large for T1ce) | Some modalities are harder to synthesise than others. Claim holds conditionally.                               |
-| nnU‑Net and SwinUNETR show different ΔDice patterns             | Synthetic quality is architecture‑dependent — the claim needs qualification.                                 |
+| nnU‑Net v2 and SwinUNETR show different ΔDice patterns             | Synthetic quality is architecture‑dependent — the claim needs qualification.                                 |
 
 ### RQ2 (Synthesis vs Native Handling)
 
@@ -298,7 +298,8 @@ We stratify downstream segmentation errors (Dice drop) by:
 
 ### RQ1 — Substitute Quality
 
-- [ ] Run nnU‑Net v2 on oracle inputs (S1–S4).
+- [x] Train & validate nnU‑Net v2 Oracle on full-modality benchmark split (Validation Mean Dice: 85.02% | WT: 92.34%, TC: 85.76%, ET: 76.95%).
+- [ ] Run nnU‑Net v2 on oracle test inputs (S1–S4).
 - [ ] Run nnU‑Net v2 on synthetic inputs (3 generators × S1–S4).
 - [ ] Run SwinUNETR on oracle inputs (S1–S4).
 - [ ] Run SwinUNETR on synthetic inputs (3 generators × S1–S4).
