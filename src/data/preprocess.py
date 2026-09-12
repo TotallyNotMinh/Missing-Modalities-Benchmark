@@ -93,6 +93,24 @@ def _resolve_raw_path(patient_dir: Path, patient_id: str, suffix: str) -> Path:
     nii_path = patient_dir / f"{patient_id}_{suffix}.nii"
     if nii_path.exists():
         return nii_path
+
+    # Fallback for segmentation mask with non-standard naming (known BraTS 2020 anomaly for case 355)
+    if suffix == "seg":
+        seg_candidates = sorted([
+            f for f in patient_dir.glob("*[sS]eg*.nii*")
+            if not f.name.startswith(".")
+        ])
+        if seg_candidates:
+            return seg_candidates[0]
+
+    # Fallback for modality with non-standard naming
+    mod_candidates = sorted([
+        f for f in patient_dir.glob(f"*{suffix}*.nii*")
+        if not f.name.startswith(".")
+    ])
+    if mod_candidates:
+        return mod_candidates[0]
+
     raise FileNotFoundError(
         f"Missing file for {patient_id} ({suffix}): neither .nii.gz nor .nii found in {patient_dir}"
     )
