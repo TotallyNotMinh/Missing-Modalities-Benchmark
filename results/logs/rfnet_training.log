@@ -1,0 +1,176 @@
+============================================================
+ RFNet Training Pipeline Initializing
+ Device: cuda:0 | Patch Size: (128, 128, 128)
+ Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
+ Output Checkpoints: checkpoints/rfnet
+============================================================
+[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
+[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
+Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]                                                Traceback (most recent call last):
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
+    main()
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
+    train_metrics = train_one_epoch(
+                    ^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 107, in train_one_epoch
+    for i, batch in enumerate(tqdm(loader, desc=f"Epoch {epoch+1}", leave=False)):
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/tqdm/std.py", line 1186, in __iter__
+    for obj in iterable:
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+           ^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1465, in _next_data
+    return self._process_data(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1491, in _process_data
+    data.reraise()
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_utils.py", line 715, in reraise
+    raise exception
+TypeError: Caught TypeError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/_utils/worker.py", line 289, in _worker_loop
+    init_fn(worker_id)
+TypeError: worker_init_fn() got an unexpected keyword argument 'seed'
+
+============================================================
+ RFNet Training Pipeline Initializing
+ Device: cuda:0 | Patch Size: (128, 128, 128)
+ Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
+ Output Checkpoints: checkpoints/rfnet
+============================================================
+[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
+[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
+Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]Epoch 1:   0%|          | 1/258 [00:04<17:30,  4.09s/it]                                                        Traceback (most recent call last):
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
+    main()
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
+    train_metrics = train_one_epoch(
+                    ^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 133, in train_one_epoch
+    fuse_pred, sep_preds, prm_preds = model(inputs, masks)
+                                      ^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 182, in forward
+    t2_pred = self.decoder_sep(t2_x1, t2_x2, t2_x3, t2_x4)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 72, in forward
+    de_x3 = self.d2_c1(self.d2(de_x3))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/layers.py", line 30, in forward
+    x = self.conv(x)
+        ^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 725, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 710, in _conv_forward
+    F.pad(
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5082, in pad
+    return handle_torch_function(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/overrides.py", line 1739, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/monai/data/meta_tensor.py", line 282, in __torch_function__
+    ret = super().__torch_function__(func, types, args, kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_tensor.py", line 1512, in __torch_function__
+    ret = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5096, in pad
+    return torch._C._nn.pad(input, pad, mode, value)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 72.00 MiB. GPU 0 has a total capacity of 23.68 GiB of which 71.81 MiB is free. Including non-PyTorch memory, this process has 23.61 GiB memory in use. Of the allocated memory 23.20 GiB is allocated by PyTorch, and 104.13 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+============================================================
+ RFNet Training Pipeline Initializing
+ Device: cuda:0 | Patch Size: (128, 128, 128)
+ Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
+ Output Checkpoints: checkpoints/rfnet
+============================================================
+[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
+[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
+Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]Epoch 1:   0%|          | 1/258 [00:03<16:19,  3.81s/it]                                                        Traceback (most recent call last):
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
+    main()
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
+    train_metrics = train_one_epoch(
+                    ^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 133, in train_one_epoch
+    fuse_pred, sep_preds, prm_preds = model(inputs, masks)
+                                      ^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 182, in forward
+    t2_pred = self.decoder_sep(t2_x1, t2_x2, t2_x3, t2_x4)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 72, in forward
+    de_x3 = self.d2_c1(self.d2(de_x3))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/layers.py", line 30, in forward
+    x = self.conv(x)
+        ^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 725, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 710, in _conv_forward
+    F.pad(
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5082, in pad
+    return handle_torch_function(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/overrides.py", line 1739, in handle_torch_function
+    result = torch_func_method(public_api, types, args, kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/monai/data/meta_tensor.py", line 282, in __torch_function__
+    ret = super().__torch_function__(func, types, args, kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_tensor.py", line 1512, in __torch_function__
+    ret = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5096, in pad
+    return torch._C._nn.pad(input, pad, mode, value)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 72.00 MiB. GPU 0 has a total capacity of 23.68 GiB of which 71.81 MiB is free. Including non-PyTorch memory, this process has 23.61 GiB memory in use. Of the allocated memory 23.20 GiB is allocated by PyTorch, and 104.13 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
