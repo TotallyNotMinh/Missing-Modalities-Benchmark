@@ -330,7 +330,7 @@ def main():
     train_ds = BraTSDataset(data_dir=data_dir, patient_ids=train_ids, transform=train_transforms)
     val_ds = BraTSDataset(data_dir=data_dir, patient_ids=val_ids, transform=val_transforms)
 
-    worker_init = partial(worker_init_fn, seed=args.seed)
+    worker_init = partial(worker_init_fn, base_seed=args.seed)
     train_loader = DataLoader(
         train_ds,
         batch_size=batch_size,

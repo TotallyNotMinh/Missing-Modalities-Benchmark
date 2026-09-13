@@ -138,10 +138,11 @@ def seed_everything(seed: int) -> None:
         pass
 
 
-def worker_init_fn(worker_id: int, base_seed: int):
+def worker_init_fn(worker_id: int, base_seed: Optional[int] = None, seed: Optional[int] = None):
     """Pass to DataLoader(worker_init_fn=partial(worker_init_fn, base_seed=cfg['seed']))
     so multi-worker DataLoaders don't silently duplicate augmentation streams."""
-    worker_seed = (base_seed + worker_id) % (2**32)
+    effective_seed = base_seed if base_seed is not None else (seed if seed is not None else 42)
+    worker_seed = (effective_seed + worker_id) % (2**32)
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
