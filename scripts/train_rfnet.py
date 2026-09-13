@@ -6,9 +6,11 @@ Trains the RFNet architecture (~8.98M parameters, basic_dims=16)
 using the benchmark's standardized splits.json, permutation from benchmark order
 (T1, T1ce, T2, FLAIR) -> RFNet order (FLAIR, T1ce, T1, T2), on-the-fly 15-combination
 missing modality dropout, and deep supervision auxiliary losses.
+Default patch size is set to 96x96x96 (96^3) to fit comfortably in 24GB VRAM
+(128^3 patch causes CUDA OOM due to RFNet's 4 parallel encoders and 5 active decoders).
 
 Usage:
-    python scripts/train_rfnet.py --epochs 300 --batch_size 1 --device cuda:0
+    python scripts/train_rfnet.py --epochs 300 --batch_size 1 --device cuda:0 --patch_size 96 96 96
     python scripts/train_rfnet.py --smoke_test --device cpu
 """
 
@@ -266,7 +268,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=None, help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=None, help="Batch size per GPU")
     parser.add_argument("--lr", type=float, default=None, help="Initial learning rate")
-    parser.add_argument("--patch_size", type=int, nargs=3, default=[128, 128, 128], help="Training crop patch size")
+    parser.add_argument("--patch_size", type=int, nargs=3, default=[96, 96, 96], help="Training crop patch size (default [96, 96, 96]; 128^3 causes OOM on 24GB VRAM)")
     parser.add_argument("--grad_accum", type=int, default=1, help="Gradient accumulation steps")
     parser.add_argument("--grad_clip", type=float, default=1.0, help="Gradient clipping norm")
     parser.add_argument("--num_workers", type=int, default=4, help="DataLoader workers")

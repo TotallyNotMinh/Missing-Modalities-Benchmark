@@ -4,7 +4,7 @@ set -e
 # ==============================================================================
 # RFNet Baseline Training Pipeline for BraTS 2020
 # Architecture: RFNet (8.98M parameters, basic_dims=16)
-# Standardized patch size: 128x128x128
+# Default patch size: 96x96x96 (96^3; 128^3 causes OOM on 24GB VRAM)
 # Target GPU  : Physical GPU 2 (CUDA_VISIBLE_DEVICES=2)
 # ==============================================================================
 
@@ -58,7 +58,7 @@ else
     echo " Launching Official RFNet 300-Epoch Training Run"
     echo " Target GPU ID : ${TARGET_GPU} (CUDA_VISIBLE_DEVICES=${TARGET_GPU})"
     echo " Batch Size    : 1"
-    echo " Patch Size    : 128x128x128"
+    echo " Patch Size    : 96x96x96 (96^3 default; 128^3 causes OOM on 24GB VRAM)"
     echo " Learning Rate : 1e-4"
     echo " Checkpoints   : checkpoints/rfnet"
     echo " Log File      : results/logs/rfnet_training.log"
@@ -72,7 +72,7 @@ mkdir -p results/logs checkpoints/rfnet
     --epochs 300 \
     --batch_size 1 \
     --lr 1e-4 \
-    --patch_size 128 128 128 \
+    --patch_size 96 96 96 \
     --val_interval 5 \
     --num_workers 4 \
     --save_dir checkpoints/rfnet \

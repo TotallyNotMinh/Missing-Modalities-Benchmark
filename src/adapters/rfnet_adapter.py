@@ -45,7 +45,7 @@ class RFNetAdapter:
       2. Automated permutation to RFNet's internal ordering: (FLAIR, T1ce, T1, T2).
       3. Missing-modality mask construction: supports Scenario IDs ('S1'-'S4'),
          explicit boolean masks, or automatic non-zero channel detection.
-      4. Sliding-window 3D volumetric inference via MONAI (default patch size 128x128x128).
+      4. Sliding-window 3D volumetric inference via MONAI (default patch size 96x96x96).
       5. Label re-mapping to standard BraTS convention:
            0: Background
            1: Necrotic / Non-enhancing tumor (NCR/NET)
@@ -78,7 +78,7 @@ class RFNetAdapter:
         self,
         weights_path: Optional[Union[str, Path]] = None,
         device: Optional[Union[str, torch.device]] = None,
-        patch_size: Tuple[int, int, int] = (128, 128, 128),
+        patch_size: Tuple[int, int, int] = (96, 96, 96),
         num_classes: int = 4,
         network: Optional[nn.Module] = None,
     ):
@@ -86,7 +86,7 @@ class RFNetAdapter:
         Args:
             weights_path: Path to checkpoint (.pth/.pt) trained weights.
             device: Device to run inference on ('cuda', 'cpu', or torch.device).
-            patch_size: 3D patch ROI size for sliding-window evaluation (default: (128, 128, 128)).
+            patch_size: 3D patch ROI size for sliding-window evaluation (default: (96, 96, 96)).
             num_classes: Number of output classes (default: 4 for BG, NCR, ED, ET).
             network: Optional pre-instantiated PyTorch nn.Module. If None, builds RFNet Model.
         """
@@ -176,13 +176,20 @@ class RFNetAdapter:
         if cfg is None:
             cfg = load_config()
 
+        paths_cfg = cfg.get("paths", {}) if hasattr(cfg, "get") else {}
+        patch_cfg = cfg.get("patch", {}) if hasattr(cfg, "get") else {}
+        training_cfg = cfg.get("training", {}) if hasattr(cfg, "get") else {}
         target_weights = (
             weights_path
-            or cfg.paths.get("rfnet_weights", None)
-            or cfg.paths.get("segmentation_weights", None)
+            or paths_cfg.get("rfnet_weights", None)
+            or paths_cfg.get("segmentation_weights", None)
         )
         target_device = device or cfg.get("device", "cuda")
-        target_patch = tuple(cfg.patch.get("size", (128, 128, 128)))
+        target_patch = tuple(
+            training_cfg.get("patch_size", None)
+            or patch_cfg.get("size", None)
+            or (96, 96, 96)
+        )
         model_cfg = cfg.get("model", {})
         target_classes = model_cfg.get("num_classes", 4)
 
@@ -342,7 +349,7 @@ class RFNetAdapter:
             input_data: (4, H, W, D) or (B, 4, H, W, D) volume or sample dict.
             mask: Optional missing-modality indicator ('S1'-'S4', boolean list, or tensor).
             return_logits: If True, returns (pred_mask, logits).
-            roi_size: Sliding window patch size. Defaults to self.patch_size (80, 80, 80).
+            roi_size: Sliding window patch size. Defaults to self.patch_size (96, 96, 96).
             overlap: Sliding window patch overlap ratio (0.0 - 1.0).
             blend_mode: Sliding window blending mode ('gaussian' or 'constant').
             postprocess_et: If True, applies official paper post-processing (zeros out ET if < et_threshold).

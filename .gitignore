@@ -55,8 +55,7 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
-*.log
+# *.log  # Allowed for training & experiment logs
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -223,6 +222,23 @@ __marimo__/
 
 # Data & Artifacts
 data/
-checkpoints/
-results/
 outputs/
+
+# Allow results directory (logs, figures, reports)
+!results/
+!results/**
+
+# Heavy model checkpoint weights and binary event caches
+*.pth
+*.pt
+*.ckpt
+*.bin
+*.tfevents*
+
+# Allow figures, plots, and logs
+!*.png
+!*.jpg
+!*.jpeg
+!*.svg
+!*.pdf
+!*.log

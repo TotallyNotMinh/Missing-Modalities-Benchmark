@@ -181,9 +181,11 @@ To eliminate data processing discrepancies as a confound, all MRI volumes pass t
 
 > [!IMPORTANT]
 > **Standardized Segmentation Input ($128^3$)**:
-> All downstream segmentation models (`nnU-Net v2`, `SwinUNETR`, `AdaMM`, `mmFormer`, `RFNet`) strictly operate on **$128 \times 128 \times 128$** volumetric inputs.
+> Downstream segmentation models (`nnU-Net v2`, `SwinUNETR`, `AdaMM`, `mmFormer`) operate on **$128 \times 128 \times 128$** volumetric inputs.
 > * **Training**: The dataloader extracts random $128^3$ spatial patches with joint spatial augmentations.
-> * **Validation & Testing**: Evaluated on deterministic $128^3$ center crops (or $128^3$ sliding-window inference), ensuring exact spatial alignment across real and synthesized modalities against ground truth segmentation masks.
+> * **Validation & Testing**: Evaluated on deterministic center crops (or sliding-window inference), ensuring exact spatial alignment across real and synthesized modalities against ground truth segmentation masks.
+>
+> *Note on RFNet ($96^3$)*: RFNet default training patch is configured to **$96 \times 96 \times 96$** ($96^3$) to fit within 24 GB VRAM (the official RFNet paper used $80^3$). Training RFNet at $128^3$ induces CUDA OOM on 24 GB GPUs due to its 4 parallel encoders, 5 concurrent 3D decoders (deep supervision), and high activation footprint in Region-Aware Modal Fusion (RFM) layers.
 
 ---
 

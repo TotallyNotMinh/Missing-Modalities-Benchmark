@@ -21,6 +21,6 @@ training:
   polynomial_power: 0.9
   max_epochs: 300
   batch_size: 1                  # 1 per GPU
-  patch_size: [128, 128, 128]    # Standardized 128^3 patch matching benchmark
+  patch_size: [96, 96, 96]       # Default set to 96^3 (96x96x96). Standard 128^3 causes OOM on 24GB VRAM due to RFNet's 4 parallel encoders + 5 decoders + high activation footprint in RFM layers.
   grad_clip: 1.0
   region_fusion_start_epoch: 100 # In official RFNet, region fusion activates at epoch 100
