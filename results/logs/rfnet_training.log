@@ -1,176 +1,360 @@
-============================================================
- RFNet Training Pipeline Initializing
- Device: cuda:0 | Patch Size: (128, 128, 128)
- Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
- Output Checkpoints: checkpoints/rfnet
-============================================================
-[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
-[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
-Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]                                                Traceback (most recent call last):
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
-    main()
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
-    train_metrics = train_one_epoch(
-                    ^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 107, in train_one_epoch
-    for i, batch in enumerate(tqdm(loader, desc=f"Epoch {epoch+1}", leave=False)):
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/tqdm/std.py", line 1186, in __iter__
-    for obj in iterable:
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
-    data = self._next_data()
-           ^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1465, in _next_data
-    return self._process_data(data)
-           ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 1491, in _process_data
-    data.reraise()
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_utils.py", line 715, in reraise
-    raise exception
-TypeError: Caught TypeError in DataLoader worker process 0.
-Original Traceback (most recent call last):
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/utils/data/_utils/worker.py", line 289, in _worker_loop
-    init_fn(worker_id)
-TypeError: worker_init_fn() got an unexpected keyword argument 'seed'
-
-============================================================
- RFNet Training Pipeline Initializing
- Device: cuda:0 | Patch Size: (128, 128, 128)
- Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
- Output Checkpoints: checkpoints/rfnet
-============================================================
-[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
-[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
-Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]Epoch 1:   0%|          | 1/258 [00:04<17:30,  4.09s/it]                                                        Traceback (most recent call last):
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
-    main()
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
-    train_metrics = train_one_epoch(
-                    ^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 133, in train_one_epoch
-    fuse_pred, sep_preds, prm_preds = model(inputs, masks)
-                                      ^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 182, in forward
-    t2_pred = self.decoder_sep(t2_x1, t2_x2, t2_x3, t2_x4)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 72, in forward
-    de_x3 = self.d2_c1(self.d2(de_x3))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/layers.py", line 30, in forward
-    x = self.conv(x)
-        ^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 725, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 710, in _conv_forward
-    F.pad(
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5082, in pad
-    return handle_torch_function(
-           ^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/overrides.py", line 1739, in handle_torch_function
-    result = torch_func_method(public_api, types, args, kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/monai/data/meta_tensor.py", line 282, in __torch_function__
-    ret = super().__torch_function__(func, types, args, kwargs)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_tensor.py", line 1512, in __torch_function__
-    ret = func(*args, **kwargs)
-          ^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5096, in pad
-    return torch._C._nn.pad(input, pad, mode, value)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 72.00 MiB. GPU 0 has a total capacity of 23.68 GiB of which 71.81 MiB is free. Including non-PyTorch memory, this process has 23.61 GiB memory in use. Of the allocated memory 23.20 GiB is allocated by PyTorch, and 104.13 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
-============================================================
- RFNet Training Pipeline Initializing
- Device: cuda:0 | Patch Size: (128, 128, 128)
- Batch Size: 1 | Epochs: 300 | Initial LR: 0.0001
- Output Checkpoints: checkpoints/rfnet
-============================================================
-[RFNet] Model constructed with 8,984,960 parameters (~8.98M).
-[RFNetAdapter] Using supplied custom PyTorch network on cuda:0.
-Epoch 1:   0%|          | 0/258 [00:00<?, ?it/s]Epoch 1:   0%|          | 1/258 [00:03<16:19,  3.81s/it]                                                        Traceback (most recent call last):
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 506, in <module>
-    main()
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 394, in main
-    train_metrics = train_one_epoch(
-                    ^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/scripts/train_rfnet.py", line 133, in train_one_epoch
-    fuse_pred, sep_preds, prm_preds = model(inputs, masks)
-                                      ^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 182, in forward
-    t2_pred = self.decoder_sep(t2_x1, t2_x2, t2_x3, t2_x4)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/models.py", line 72, in forward
-    de_x3 = self.d2_c1(self.d2(de_x3))
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/minhdn/Missing-Modalities-Benchmark/externals/rfnet/layers.py", line 30, in forward
-    x = self.conv(x)
-        ^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 725, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/modules/conv.py", line 710, in _conv_forward
-    F.pad(
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5082, in pad
-    return handle_torch_function(
-           ^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/overrides.py", line 1739, in handle_torch_function
-    result = torch_func_method(public_api, types, args, kwargs)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/monai/data/meta_tensor.py", line 282, in __torch_function__
-    ret = super().__torch_function__(func, types, args, kwargs)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/_tensor.py", line 1512, in __torch_function__
-    ret = func(*args, **kwargs)
-          ^^^^^^^^^^^^^^^^^^^^^
-  File "/storage/student14/miniconda3/envs/missing-modalities/lib/python3.11/site-packages/torch/nn/functional.py", line 5096, in pad
-    return torch._C._nn.pad(input, pad, mode, value)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 72.00 MiB. GPU 0 has a total capacity of 23.68 GiB of which 71.81 MiB is free. Including non-PyTorch memory, this process has 23.61 GiB memory in use. Of the allocated memory 23.20 GiB is allocated by PyTorch, and 104.13 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Epoch [1/300] - Loss: 7.6568 (Fuse: 1.0448, Sep: 3.9200, PRM: 3.7367) | LR: 0.000100
+Epoch [2/300] - Loss: 7.2161 (Fuse: 1.0487, Sep: 3.7151, PRM: 3.5010) | LR: 0.000100
+Epoch [3/300] - Loss: 6.9405 (Fuse: 1.0344, Sep: 3.5791, PRM: 3.3615) | LR: 0.000099
+Epoch [4/300] - Loss: 6.7974 (Fuse: 1.0271, Sep: 3.4970, PRM: 3.3003) | LR: 0.000099
+Epoch [5/300] - Loss: 6.6234 (Fuse: 1.0374, Sep: 3.4122, PRM: 3.2112) | LR: 0.000099
+[Validation] Epoch [5/300] - Mean Dice: 0.0149 (WT: 0.0195, TC: 0.0044, ET: 0.0207)
+Epoch [6/300] - Loss: 6.5253 (Fuse: 1.0383, Sep: 3.3455, PRM: 3.1798) | LR: 0.000098
+Epoch [7/300] - Loss: 6.3728 (Fuse: 1.0311, Sep: 3.2631, PRM: 3.1097) | LR: 0.000098
+Epoch [8/300] - Loss: 6.2959 (Fuse: 1.0329, Sep: 3.2080, PRM: 3.0880) | LR: 0.000098
+Epoch [9/300] - Loss: 6.1899 (Fuse: 1.0356, Sep: 3.1665, PRM: 3.0233) | LR: 0.000098
+Epoch [10/300] - Loss: 6.1520 (Fuse: 1.0348, Sep: 3.1256, PRM: 3.0264) | LR: 0.000097
+[Validation] Epoch [10/300] - Mean Dice: 0.0130 (WT: 0.0178, TC: 0.0042, ET: 0.0170)
+Epoch [11/300] - Loss: 6.0380 (Fuse: 1.0371, Sep: 3.0807, PRM: 2.9574) | LR: 0.000097
+Epoch [12/300] - Loss: 6.0019 (Fuse: 1.0334, Sep: 3.0642, PRM: 2.9377) | LR: 0.000097
+Epoch [13/300] - Loss: 5.9191 (Fuse: 1.0392, Sep: 3.0115, PRM: 2.9076) | LR: 0.000096
+Epoch [14/300] - Loss: 5.8605 (Fuse: 1.0485, Sep: 3.0016, PRM: 2.8589) | LR: 0.000096
+Epoch [15/300] - Loss: 5.8726 (Fuse: 1.0354, Sep: 2.9858, PRM: 2.8868) | LR: 0.000096
+[Validation] Epoch [15/300] - Mean Dice: 0.0145 (WT: 0.0187, TC: 0.0045, ET: 0.0204)
+Epoch [16/300] - Loss: 5.7900 (Fuse: 1.0438, Sep: 2.9491, PRM: 2.8409) | LR: 0.000095
+Epoch [17/300] - Loss: 5.7820 (Fuse: 1.0254, Sep: 2.9369, PRM: 2.8451) | LR: 0.000095
+Epoch [18/300] - Loss: 5.6714 (Fuse: 1.0478, Sep: 2.9061, PRM: 2.7653) | LR: 0.000095
+Epoch [19/300] - Loss: 5.6003 (Fuse: 1.0409, Sep: 2.8751, PRM: 2.7252) | LR: 0.000095
+Epoch [20/300] - Loss: 5.6391 (Fuse: 1.0314, Sep: 2.8873, PRM: 2.7519) | LR: 0.000094
+[Validation] Epoch [20/300] - Mean Dice: 0.0145 (WT: 0.0180, TC: 0.0047, ET: 0.0208)
+Epoch [21/300] - Loss: 5.5607 (Fuse: 1.0446, Sep: 2.8395, PRM: 2.7212) | LR: 0.000094
+Epoch [22/300] - Loss: 5.5013 (Fuse: 1.0369, Sep: 2.8303, PRM: 2.6710) | LR: 0.000094
+Epoch [23/300] - Loss: 5.5460 (Fuse: 1.0428, Sep: 2.8435, PRM: 2.7024) | LR: 0.000093
+Epoch [24/300] - Loss: 5.5401 (Fuse: 1.0453, Sep: 2.8430, PRM: 2.6971) | LR: 0.000093
+Epoch [25/300] - Loss: 5.4886 (Fuse: 1.0428, Sep: 2.8213, PRM: 2.6673) | LR: 0.000093
+[Validation] Epoch [25/300] - Mean Dice: 0.0155 (WT: 0.0179, TC: 0.0044, ET: 0.0242)
+Epoch [26/300] - Loss: 5.4424 (Fuse: 1.0492, Sep: 2.8055, PRM: 2.6369) | LR: 0.000092
+Epoch [27/300] - Loss: 5.3602 (Fuse: 1.0408, Sep: 2.7669, PRM: 2.5933) | LR: 0.000092
+Epoch [28/300] - Loss: 5.3509 (Fuse: 1.0446, Sep: 2.7539, PRM: 2.5970) | LR: 0.000092
+Epoch [29/300] - Loss: 5.3250 (Fuse: 1.0482, Sep: 2.7410, PRM: 2.5840) | LR: 0.000092
+Epoch [30/300] - Loss: 5.3834 (Fuse: 1.0208, Sep: 2.7730, PRM: 2.6104) | LR: 0.000091
+[Validation] Epoch [30/300] - Mean Dice: 0.0147 (WT: 0.0183, TC: 0.0046, ET: 0.0211)
+Epoch [31/300] - Loss: 5.3433 (Fuse: 1.0494, Sep: 2.7435, PRM: 2.5998) | LR: 0.000091
+Epoch [32/300] - Loss: 5.2649 (Fuse: 1.0419, Sep: 2.7119, PRM: 2.5530) | LR: 0.000091
+Epoch [33/300] - Loss: 5.3501 (Fuse: 1.0371, Sep: 2.7458, PRM: 2.6043) | LR: 0.000090
+Epoch [34/300] - Loss: 5.3732 (Fuse: 1.0414, Sep: 2.7539, PRM: 2.6193) | LR: 0.000090
+Epoch [35/300] - Loss: 5.2696 (Fuse: 1.0441, Sep: 2.7119, PRM: 2.5577) | LR: 0.000090
+[Validation] Epoch [35/300] - Mean Dice: 0.0139 (WT: 0.0178, TC: 0.0048, ET: 0.0190)
+Epoch [36/300] - Loss: 5.3021 (Fuse: 1.0578, Sep: 2.7196, PRM: 2.5825) | LR: 0.000089
+Epoch [37/300] - Loss: 5.2567 (Fuse: 1.0466, Sep: 2.7085, PRM: 2.5482) | LR: 0.000089
+Epoch [38/300] - Loss: 5.1536 (Fuse: 1.0387, Sep: 2.6513, PRM: 2.5023) | LR: 0.000089
+Epoch [39/300] - Loss: 5.1570 (Fuse: 1.0434, Sep: 2.6591, PRM: 2.4979) | LR: 0.000089
+Epoch [40/300] - Loss: 5.1500 (Fuse: 1.0489, Sep: 2.6530, PRM: 2.4971) | LR: 0.000088
+[Validation] Epoch [40/300] - Mean Dice: 0.0146 (WT: 0.0178, TC: 0.0046, ET: 0.0214)
+Epoch [41/300] - Loss: 5.1887 (Fuse: 1.0452, Sep: 2.6701, PRM: 2.5186) | LR: 0.000088
+Epoch [42/300] - Loss: 5.2659 (Fuse: 1.0436, Sep: 2.7025, PRM: 2.5633) | LR: 0.000088
+Epoch [43/300] - Loss: 5.1494 (Fuse: 1.0532, Sep: 2.6583, PRM: 2.4911) | LR: 0.000087
+Epoch [44/300] - Loss: 5.2158 (Fuse: 1.0373, Sep: 2.6849, PRM: 2.5309) | LR: 0.000087
+Epoch [45/300] - Loss: 5.0798 (Fuse: 1.0516, Sep: 2.6214, PRM: 2.4584) | LR: 0.000087
+[Validation] Epoch [45/300] - Mean Dice: 0.0171 (WT: 0.0182, TC: 0.0051, ET: 0.0280)
+Epoch [46/300] - Loss: 5.1816 (Fuse: 1.0439, Sep: 2.6700, PRM: 2.5116) | LR: 0.000086
+Epoch [47/300] - Loss: 5.0825 (Fuse: 1.0500, Sep: 2.6257, PRM: 2.4568) | LR: 0.000086
+Epoch [48/300] - Loss: 5.0552 (Fuse: 1.0417, Sep: 2.6137, PRM: 2.4415) | LR: 0.000086
+Epoch [49/300] - Loss: 5.0373 (Fuse: 1.0445, Sep: 2.6096, PRM: 2.4277) | LR: 0.000085
+Epoch [50/300] - Loss: 5.1053 (Fuse: 1.0252, Sep: 2.6281, PRM: 2.4772) | LR: 0.000085
+[Validation] Epoch [50/300] - Mean Dice: 0.0181 (WT: 0.0175, TC: 0.0044, ET: 0.0325)
+Epoch [51/300] - Loss: 5.0827 (Fuse: 1.0448, Sep: 2.5958, PRM: 2.4869) | LR: 0.000085
+Epoch [52/300] - Loss: 5.0486 (Fuse: 1.0302, Sep: 2.6042, PRM: 2.4444) | LR: 0.000085
+Epoch [53/300] - Loss: 5.0487 (Fuse: 1.0401, Sep: 2.5982, PRM: 2.4506) | LR: 0.000084
+Epoch [54/300] - Loss: 5.0301 (Fuse: 1.0476, Sep: 2.5962, PRM: 2.4339) | LR: 0.000084
+Epoch [55/300] - Loss: 5.0673 (Fuse: 1.0515, Sep: 2.6328, PRM: 2.4346) | LR: 0.000084
+[Validation] Epoch [55/300] - Mean Dice: 0.0156 (WT: 0.0182, TC: 0.0048, ET: 0.0236)
+Epoch [56/300] - Loss: 5.0714 (Fuse: 1.0409, Sep: 2.6108, PRM: 2.4606) | LR: 0.000083
+Epoch [57/300] - Loss: 4.9470 (Fuse: 1.0477, Sep: 2.5660, PRM: 2.3809) | LR: 0.000083
+Epoch [58/300] - Loss: 4.9080 (Fuse: 1.0509, Sep: 2.5297, PRM: 2.3783) | LR: 0.000083
+Epoch [59/300] - Loss: 4.8608 (Fuse: 1.0487, Sep: 2.5354, PRM: 2.3254) | LR: 0.000082
+Epoch [60/300] - Loss: 5.0200 (Fuse: 1.0556, Sep: 2.6041, PRM: 2.4160) | LR: 0.000082
+[Validation] Epoch [60/300] - Mean Dice: 0.0147 (WT: 0.0178, TC: 0.0048, ET: 0.0216)
+Epoch [61/300] - Loss: 4.9542 (Fuse: 1.0459, Sep: 2.5688, PRM: 2.3853) | LR: 0.000082
+Epoch [62/300] - Loss: 4.9794 (Fuse: 1.0417, Sep: 2.5671, PRM: 2.4122) | LR: 0.000081
+Epoch [63/300] - Loss: 4.8260 (Fuse: 1.0476, Sep: 2.4909, PRM: 2.3351) | LR: 0.000081
+Epoch [64/300] - Loss: 4.9195 (Fuse: 1.0403, Sep: 2.5468, PRM: 2.3727) | LR: 0.000081
+Epoch [65/300] - Loss: 4.9083 (Fuse: 1.0449, Sep: 2.5286, PRM: 2.3797) | LR: 0.000081
+[Validation] Epoch [65/300] - Mean Dice: 0.0159 (WT: 0.0180, TC: 0.0049, ET: 0.0249)
+Epoch [66/300] - Loss: 4.8142 (Fuse: 1.0427, Sep: 2.4874, PRM: 2.3268) | LR: 0.000080
+Epoch [67/300] - Loss: 4.8010 (Fuse: 1.0499, Sep: 2.4795, PRM: 2.3215) | LR: 0.000080
+Epoch [68/300] - Loss: 4.8741 (Fuse: 1.0400, Sep: 2.5279, PRM: 2.3462) | LR: 0.000080
+Epoch [69/300] - Loss: 4.8133 (Fuse: 1.0510, Sep: 2.5018, PRM: 2.3114) | LR: 0.000079
+Epoch [70/300] - Loss: 4.9191 (Fuse: 1.0435, Sep: 2.5403, PRM: 2.3789) | LR: 0.000079
+[Validation] Epoch [70/300] - Mean Dice: 0.0154 (WT: 0.0181, TC: 0.0048, ET: 0.0232)
+Epoch [71/300] - Loss: 4.8899 (Fuse: 1.0471, Sep: 2.5320, PRM: 2.3579) | LR: 0.000079
+Epoch [72/300] - Loss: 4.7878 (Fuse: 1.0416, Sep: 2.4813, PRM: 2.3064) | LR: 0.000078
+Epoch [73/300] - Loss: 4.8433 (Fuse: 1.0411, Sep: 2.5049, PRM: 2.3384) | LR: 0.000078
+Epoch [74/300] - Loss: 4.8333 (Fuse: 1.0510, Sep: 2.5027, PRM: 2.3306) | LR: 0.000078
+Epoch [75/300] - Loss: 4.7878 (Fuse: 1.0418, Sep: 2.5057, PRM: 2.2821) | LR: 0.000077
+[Validation] Epoch [75/300] - Mean Dice: 0.0149 (WT: 0.0179, TC: 0.0048, ET: 0.0219)
+Epoch [76/300] - Loss: 4.8392 (Fuse: 1.0432, Sep: 2.5012, PRM: 2.3380) | LR: 0.000077
+Epoch [77/300] - Loss: 4.8131 (Fuse: 1.0534, Sep: 2.4763, PRM: 2.3368) | LR: 0.000077
+Epoch [78/300] - Loss: 4.7248 (Fuse: 1.0557, Sep: 2.4562, PRM: 2.2686) | LR: 0.000077
+Epoch [79/300] - Loss: 4.7808 (Fuse: 1.0475, Sep: 2.4727, PRM: 2.3081) | LR: 0.000076
+Epoch [80/300] - Loss: 4.7757 (Fuse: 1.0462, Sep: 2.4563, PRM: 2.3193) | LR: 0.000076
+[Validation] Epoch [80/300] - Mean Dice: 0.0164 (WT: 0.0185, TC: 0.0052, ET: 0.0256)
+Epoch [81/300] - Loss: 4.7457 (Fuse: 1.0414, Sep: 2.4476, PRM: 2.2981) | LR: 0.000076
+Epoch [82/300] - Loss: 4.5874 (Fuse: 1.0548, Sep: 2.3907, PRM: 2.1967) | LR: 0.000075
+Epoch [83/300] - Loss: 4.7230 (Fuse: 1.0496, Sep: 2.4504, PRM: 2.2726) | LR: 0.000075
+Epoch [84/300] - Loss: 4.7568 (Fuse: 1.0435, Sep: 2.4600, PRM: 2.2969) | LR: 0.000075
+Epoch [85/300] - Loss: 4.8430 (Fuse: 1.0443, Sep: 2.4925, PRM: 2.3505) | LR: 0.000074
+[Validation] Epoch [85/300] - Mean Dice: 0.0157 (WT: 0.0180, TC: 0.0051, ET: 0.0240)
+Epoch [86/300] - Loss: 4.8526 (Fuse: 1.0257, Sep: 2.4965, PRM: 2.3561) | LR: 0.000074
+Epoch [87/300] - Loss: 4.6878 (Fuse: 1.0434, Sep: 2.4278, PRM: 2.2600) | LR: 0.000074
+Epoch [88/300] - Loss: 4.7707 (Fuse: 1.0377, Sep: 2.4702, PRM: 2.3004) | LR: 0.000073
+Epoch [89/300] - Loss: 4.8939 (Fuse: 1.0269, Sep: 2.4883, PRM: 2.4056) | LR: 0.000073
+Epoch [90/300] - Loss: 4.6469 (Fuse: 1.0563, Sep: 2.3991, PRM: 2.2477) | LR: 0.000073
+[Validation] Epoch [90/300] - Mean Dice: 0.0155 (WT: 0.0181, TC: 0.0047, ET: 0.0237)
+Epoch [91/300] - Loss: 4.6157 (Fuse: 1.0453, Sep: 2.3881, PRM: 2.2276) | LR: 0.000073
+Epoch [92/300] - Loss: 4.6292 (Fuse: 1.0551, Sep: 2.4033, PRM: 2.2259) | LR: 0.000072
+Epoch [93/300] - Loss: 4.6903 (Fuse: 1.0272, Sep: 2.4111, PRM: 2.2792) | LR: 0.000072
+Epoch [94/300] - Loss: 4.6557 (Fuse: 1.0497, Sep: 2.4060, PRM: 2.2498) | LR: 0.000072
+Epoch [95/300] - Loss: 4.6078 (Fuse: 1.0467, Sep: 2.3793, PRM: 2.2285) | LR: 0.000071
+[Validation] Epoch [95/300] - Mean Dice: 0.0177 (WT: 0.0184, TC: 0.0050, ET: 0.0297)
+Epoch [96/300] - Loss: 4.6020 (Fuse: 1.0621, Sep: 2.3774, PRM: 2.2247) | LR: 0.000071
+Epoch [97/300] - Loss: 4.7432 (Fuse: 1.0366, Sep: 2.4292, PRM: 2.3140) | LR: 0.000071
+Epoch [98/300] - Loss: 4.6694 (Fuse: 1.0429, Sep: 2.4259, PRM: 2.2435) | LR: 0.000070
+Epoch [99/300] - Loss: 4.6485 (Fuse: 1.0450, Sep: 2.4088, PRM: 2.2396) | LR: 0.000070
+Epoch [100/300] - Loss: 4.6907 (Fuse: 1.0441, Sep: 2.4247, PRM: 2.2660) | LR: 0.000070
+[Validation] Epoch [100/300] - Mean Dice: 0.0157 (WT: 0.0197, TC: 0.0054, ET: 0.0219)
+Epoch [101/300] - Loss: 5.6420 (Fuse: 0.8857, Sep: 2.4504, PRM: 2.3059) | LR: 0.000069
+Epoch [102/300] - Loss: 5.5643 (Fuse: 0.8333, Sep: 2.4271, PRM: 2.3040) | LR: 0.000069
+Epoch [103/300] - Loss: 5.5847 (Fuse: 0.8014, Sep: 2.4600, PRM: 2.3233) | LR: 0.000069
+Epoch [104/300] - Loss: 5.4607 (Fuse: 0.7799, Sep: 2.4270, PRM: 2.2538) | LR: 0.000068
+Epoch [105/300] - Loss: 5.4465 (Fuse: 0.7664, Sep: 2.4064, PRM: 2.2736) | LR: 0.000068
+[Validation] Epoch [105/300] - Mean Dice: 0.4021 (WT: 0.4188, TC: 0.2349, ET: 0.5526)
+Epoch [106/300] - Loss: 5.4989 (Fuse: 0.7559, Sep: 2.4366, PRM: 2.3064) | LR: 0.000068
+Epoch [107/300] - Loss: 5.3598 (Fuse: 0.7306, Sep: 2.4026, PRM: 2.2267) | LR: 0.000068
+Epoch [108/300] - Loss: 5.3850 (Fuse: 0.7235, Sep: 2.3937, PRM: 2.2678) | LR: 0.000067
+Epoch [109/300] - Loss: 5.4218 (Fuse: 0.7029, Sep: 2.4407, PRM: 2.2782) | LR: 0.000067
+Epoch [110/300] - Loss: 5.3561 (Fuse: 0.6937, Sep: 2.4020, PRM: 2.2604) | LR: 0.000067
+[Validation] Epoch [110/300] - Mean Dice: 0.7583 (WT: 0.8379, TC: 0.7479, ET: 0.6891)
+Epoch [111/300] - Loss: 5.3281 (Fuse: 0.6866, Sep: 2.3781, PRM: 2.2634) | LR: 0.000066
+Epoch [112/300] - Loss: 5.2555 (Fuse: 0.6715, Sep: 2.3644, PRM: 2.2196) | LR: 0.000066
+Epoch [113/300] - Loss: 5.2824 (Fuse: 0.6638, Sep: 2.3855, PRM: 2.2331) | LR: 0.000066
+Epoch [114/300] - Loss: 5.3255 (Fuse: 0.6587, Sep: 2.4023, PRM: 2.2645) | LR: 0.000065
+Epoch [115/300] - Loss: 5.2041 (Fuse: 0.6415, Sep: 2.3615, PRM: 2.2010) | LR: 0.000065
+[Validation] Epoch [115/300] - Mean Dice: 0.7745 (WT: 0.8552, TC: 0.7843, ET: 0.6839)
+Epoch [116/300] - Loss: 5.2310 (Fuse: 0.6363, Sep: 2.3793, PRM: 2.2155) | LR: 0.000065
+Epoch [117/300] - Loss: 5.2241 (Fuse: 0.6340, Sep: 2.3567, PRM: 2.2335) | LR: 0.000064
+Epoch [118/300] - Loss: 5.3497 (Fuse: 0.6420, Sep: 2.4239, PRM: 2.2838) | LR: 0.000064
+Epoch [119/300] - Loss: 5.1748 (Fuse: 0.6188, Sep: 2.3511, PRM: 2.2049) | LR: 0.000064
+Epoch [120/300] - Loss: 5.2204 (Fuse: 0.6178, Sep: 2.3748, PRM: 2.2278) | LR: 0.000063
+[Validation] Epoch [120/300] - Mean Dice: 0.7958 (WT: 0.8762, TC: 0.8116, ET: 0.6996)
+Epoch [121/300] - Loss: 5.2324 (Fuse: 0.6126, Sep: 2.3910, PRM: 2.2288) | LR: 0.000063
+Epoch [122/300] - Loss: 5.2250 (Fuse: 0.6143, Sep: 2.3646, PRM: 2.2461) | LR: 0.000063
+Epoch [123/300] - Loss: 5.2920 (Fuse: 0.6155, Sep: 2.4024, PRM: 2.2742) | LR: 0.000063
+Epoch [124/300] - Loss: 5.1765 (Fuse: 0.6048, Sep: 2.3395, PRM: 2.2322) | LR: 0.000062
+Epoch [125/300] - Loss: 5.1639 (Fuse: 0.5966, Sep: 2.3554, PRM: 2.2119) | LR: 0.000062
+[Validation] Epoch [125/300] - Mean Dice: 0.7959 (WT: 0.8774, TC: 0.8052, ET: 0.7050)
+Epoch [126/300] - Loss: 5.2104 (Fuse: 0.5947, Sep: 2.3864, PRM: 2.2293) | LR: 0.000062
+Epoch [127/300] - Loss: 5.1856 (Fuse: 0.5938, Sep: 2.3656, PRM: 2.2263) | LR: 0.000061
+Epoch [128/300] - Loss: 5.1002 (Fuse: 0.5738, Sep: 2.3523, PRM: 2.1740) | LR: 0.000061
+Epoch [129/300] - Loss: 5.0651 (Fuse: 0.5685, Sep: 2.3341, PRM: 2.1624) | LR: 0.000061
+Epoch [130/300] - Loss: 4.8982 (Fuse: 0.5529, Sep: 2.2448, PRM: 2.1005) | LR: 0.000060
+[Validation] Epoch [130/300] - Mean Dice: 0.8054 (WT: 0.8856, TC: 0.8114, ET: 0.7190)
+Epoch [131/300] - Loss: 5.1437 (Fuse: 0.5737, Sep: 2.3545, PRM: 2.2154) | LR: 0.000060
+Epoch [132/300] - Loss: 5.0079 (Fuse: 0.5624, Sep: 2.2880, PRM: 2.1575) | LR: 0.000060
+Epoch [133/300] - Loss: 5.1018 (Fuse: 0.5660, Sep: 2.3472, PRM: 2.1886) | LR: 0.000059
+Epoch [134/300] - Loss: 5.0474 (Fuse: 0.5617, Sep: 2.3067, PRM: 2.1790) | LR: 0.000059
+Epoch [135/300] - Loss: 5.1883 (Fuse: 0.5714, Sep: 2.3759, PRM: 2.2410) | LR: 0.000059
+[Validation] Epoch [135/300] - Mean Dice: 0.8063 (WT: 0.8881, TC: 0.8071, ET: 0.7236)
+Epoch [136/300] - Loss: 4.9977 (Fuse: 0.5492, Sep: 2.2978, PRM: 2.1508) | LR: 0.000058
+Epoch [137/300] - Loss: 5.1289 (Fuse: 0.5657, Sep: 2.3332, PRM: 2.2300) | LR: 0.000058
+Epoch [138/300] - Loss: 4.9782 (Fuse: 0.5459, Sep: 2.2772, PRM: 2.1552) | LR: 0.000058
+Epoch [139/300] - Loss: 5.1098 (Fuse: 0.5580, Sep: 2.3549, PRM: 2.1970) | LR: 0.000057
+Epoch [140/300] - Loss: 5.0483 (Fuse: 0.5509, Sep: 2.3175, PRM: 2.1799) | LR: 0.000057
+[Validation] Epoch [140/300] - Mean Dice: 0.8092 (WT: 0.8897, TC: 0.8107, ET: 0.7270)
+Epoch [141/300] - Loss: 5.0311 (Fuse: 0.5439, Sep: 2.3218, PRM: 2.1654) | LR: 0.000057
+Epoch [142/300] - Loss: 5.1067 (Fuse: 0.5542, Sep: 2.3393, PRM: 2.2131) | LR: 0.000056
+Epoch [143/300] - Loss: 4.9907 (Fuse: 0.5384, Sep: 2.2978, PRM: 2.1545) | LR: 0.000056
+Epoch [144/300] - Loss: 4.9641 (Fuse: 0.5312, Sep: 2.2922, PRM: 2.1407) | LR: 0.000056
+Epoch [145/300] - Loss: 5.0076 (Fuse: 0.5463, Sep: 2.2702, PRM: 2.1911) | LR: 0.000056
+[Validation] Epoch [145/300] - Mean Dice: 0.8100 (WT: 0.8761, TC: 0.8215, ET: 0.7325)
+Epoch [146/300] - Loss: 4.9317 (Fuse: 0.5225, Sep: 2.2974, PRM: 2.1118) | LR: 0.000055
+Epoch [147/300] - Loss: 5.1536 (Fuse: 0.5538, Sep: 2.3636, PRM: 2.2362) | LR: 0.000055
+Epoch [148/300] - Loss: 4.8778 (Fuse: 0.5191, Sep: 2.2496, PRM: 2.1091) | LR: 0.000055
+Epoch [149/300] - Loss: 5.0548 (Fuse: 0.5449, Sep: 2.3060, PRM: 2.2039) | LR: 0.000054
+Epoch [150/300] - Loss: 4.9720 (Fuse: 0.5318, Sep: 2.2804, PRM: 2.1598) | LR: 0.000054
+[Validation] Epoch [150/300] - Mean Dice: 0.7957 (WT: 0.8784, TC: 0.7975, ET: 0.7112)
+Epoch [151/300] - Loss: 5.0570 (Fuse: 0.5384, Sep: 2.3321, PRM: 2.1865) | LR: 0.000054
+Epoch [152/300] - Loss: 4.9097 (Fuse: 0.5191, Sep: 2.2654, PRM: 2.1253) | LR: 0.000053
+Epoch [153/300] - Loss: 5.0848 (Fuse: 0.5443, Sep: 2.3211, PRM: 2.2195) | LR: 0.000053
+Epoch [154/300] - Loss: 4.9228 (Fuse: 0.5234, Sep: 2.2491, PRM: 2.1503) | LR: 0.000053
+Epoch [155/300] - Loss: 4.9784 (Fuse: 0.5249, Sep: 2.2963, PRM: 2.1572) | LR: 0.000052
+[Validation] Epoch [155/300] - Mean Dice: 0.8155 (WT: 0.8942, TC: 0.8027, ET: 0.7496)
+Epoch [156/300] - Loss: 5.0552 (Fuse: 0.5353, Sep: 2.3251, PRM: 2.1948) | LR: 0.000052
+Epoch [157/300] - Loss: 4.9807 (Fuse: 0.5252, Sep: 2.2944, PRM: 2.1610) | LR: 0.000052
+Epoch [158/300] - Loss: 5.0377 (Fuse: 0.5328, Sep: 2.3082, PRM: 2.1967) | LR: 0.000051
+Epoch [159/300] - Loss: 5.1055 (Fuse: 0.5432, Sep: 2.3349, PRM: 2.2274) | LR: 0.000051
+Epoch [160/300] - Loss: 5.0063 (Fuse: 0.5271, Sep: 2.3039, PRM: 2.1754) | LR: 0.000051
+[Validation] Epoch [160/300] - Mean Dice: 0.8083 (WT: 0.8924, TC: 0.8065, ET: 0.7259)
+Epoch [161/300] - Loss: 4.8691 (Fuse: 0.5077, Sep: 2.2532, PRM: 2.1082) | LR: 0.000050
+Epoch [162/300] - Loss: 4.9598 (Fuse: 0.5194, Sep: 2.2912, PRM: 2.1492) | LR: 0.000050
+Epoch [163/300] - Loss: 4.8181 (Fuse: 0.5033, Sep: 2.2189, PRM: 2.0959) | LR: 0.000050
+Epoch [164/300] - Loss: 4.9462 (Fuse: 0.5188, Sep: 2.2719, PRM: 2.1555) | LR: 0.000049
+Epoch [165/300] - Loss: 4.9125 (Fuse: 0.5098, Sep: 2.2730, PRM: 2.1296) | LR: 0.000049
+[Validation] Epoch [165/300] - Mean Dice: 0.8161 (WT: 0.8930, TC: 0.8072, ET: 0.7482)
+Epoch [166/300] - Loss: 4.9027 (Fuse: 0.5063, Sep: 2.2800, PRM: 2.1165) | LR: 0.000049
+Epoch [167/300] - Loss: 4.9708 (Fuse: 0.5208, Sep: 2.2771, PRM: 2.1729) | LR: 0.000048
+Epoch [168/300] - Loss: 5.0298 (Fuse: 0.5285, Sep: 2.2985, PRM: 2.2027) | LR: 0.000048
+Epoch [169/300] - Loss: 4.8660 (Fuse: 0.5069, Sep: 2.2332, PRM: 2.1260) | LR: 0.000048
+Epoch [170/300] - Loss: 4.9305 (Fuse: 0.5094, Sep: 2.2768, PRM: 2.1443) | LR: 0.000047
+[Validation] Epoch [170/300] - Mean Dice: 0.8111 (WT: 0.8922, TC: 0.8109, ET: 0.7303)
+Epoch [171/300] - Loss: 4.9245 (Fuse: 0.5081, Sep: 2.2841, PRM: 2.1323) | LR: 0.000047
+Epoch [172/300] - Loss: 4.8992 (Fuse: 0.5049, Sep: 2.2694, PRM: 2.1249) | LR: 0.000047
+Epoch [173/300] - Loss: 5.0453 (Fuse: 0.5264, Sep: 2.3190, PRM: 2.1999) | LR: 0.000046
+Epoch [174/300] - Loss: 4.9157 (Fuse: 0.5123, Sep: 2.2554, PRM: 2.1480) | LR: 0.000046
+Epoch [175/300] - Loss: 4.8606 (Fuse: 0.5024, Sep: 2.2385, PRM: 2.1197) | LR: 0.000046
+[Validation] Epoch [175/300] - Mean Dice: 0.8354 (WT: 0.9036, TC: 0.8227, ET: 0.7798)
+Epoch [176/300] - Loss: 4.9191 (Fuse: 0.5089, Sep: 2.2684, PRM: 2.1419) | LR: 0.000045
+Epoch [177/300] - Loss: 4.8660 (Fuse: 0.5035, Sep: 2.2369, PRM: 2.1256) | LR: 0.000045
+Epoch [178/300] - Loss: 4.9972 (Fuse: 0.5182, Sep: 2.3023, PRM: 2.1767) | LR: 0.000045
+Epoch [179/300] - Loss: 4.9225 (Fuse: 0.5072, Sep: 2.2741, PRM: 2.1413) | LR: 0.000044
+Epoch [180/300] - Loss: 4.9834 (Fuse: 0.5165, Sep: 2.2860, PRM: 2.1810) | LR: 0.000044
+[Validation] Epoch [180/300] - Mean Dice: 0.8070 (WT: 0.8876, TC: 0.8011, ET: 0.7323)
+Epoch [181/300] - Loss: 4.8803 (Fuse: 0.4976, Sep: 2.2685, PRM: 2.1141) | LR: 0.000044
+Epoch [182/300] - Loss: 4.7963 (Fuse: 0.4899, Sep: 2.2214, PRM: 2.0851) | LR: 0.000044
+Epoch [183/300] - Loss: 4.9250 (Fuse: 0.5094, Sep: 2.2587, PRM: 2.1569) | LR: 0.000043
+Epoch [184/300] - Loss: 4.9058 (Fuse: 0.5040, Sep: 2.2613, PRM: 2.1405) | LR: 0.000043
+Epoch [185/300] - Loss: 4.8511 (Fuse: 0.4998, Sep: 2.2345, PRM: 2.1168) | LR: 0.000043
+[Validation] Epoch [185/300] - Mean Dice: 0.8155 (WT: 0.9008, TC: 0.8141, ET: 0.7317)
+Epoch [186/300] - Loss: 4.8326 (Fuse: 0.4979, Sep: 2.2250, PRM: 2.1098) | LR: 0.000042
+Epoch [187/300] - Loss: 4.8533 (Fuse: 0.5014, Sep: 2.2271, PRM: 2.1249) | LR: 0.000042
+Epoch [188/300] - Loss: 4.9572 (Fuse: 0.5172, Sep: 2.2592, PRM: 2.1808) | LR: 0.000042
+Epoch [189/300] - Loss: 4.8592 (Fuse: 0.4986, Sep: 2.2357, PRM: 2.1249) | LR: 0.000041
+Epoch [190/300] - Loss: 4.8131 (Fuse: 0.4915, Sep: 2.2170, PRM: 2.1046) | LR: 0.000041
+[Validation] Epoch [190/300] - Mean Dice: 0.8195 (WT: 0.9029, TC: 0.8214, ET: 0.7340)
+Epoch [191/300] - Loss: 4.8198 (Fuse: 0.4932, Sep: 2.2178, PRM: 2.1087) | LR: 0.000041
+Epoch [192/300] - Loss: 4.8231 (Fuse: 0.4928, Sep: 2.2236, PRM: 2.1067) | LR: 0.000040
+Epoch [193/300] - Loss: 4.8484 (Fuse: 0.4985, Sep: 2.2213, PRM: 2.1286) | LR: 0.000040
+Epoch [194/300] - Loss: 4.8225 (Fuse: 0.4899, Sep: 2.2316, PRM: 2.1010) | LR: 0.000040
+Epoch [195/300] - Loss: 4.8517 (Fuse: 0.4992, Sep: 2.2172, PRM: 2.1353) | LR: 0.000039
+[Validation] Epoch [195/300] - Mean Dice: 0.8243 (WT: 0.8992, TC: 0.8297, ET: 0.7441)
+Epoch [196/300] - Loss: 4.8140 (Fuse: 0.4940, Sep: 2.2100, PRM: 2.1101) | LR: 0.000039
+Epoch [197/300] - Loss: 4.8108 (Fuse: 0.4924, Sep: 2.2138, PRM: 2.1046) | LR: 0.000039
+Epoch [198/300] - Loss: 4.7755 (Fuse: 0.4814, Sep: 2.2215, PRM: 2.0727) | LR: 0.000038
+Epoch [199/300] - Loss: 4.8608 (Fuse: 0.4915, Sep: 2.2577, PRM: 2.1116) | LR: 0.000038
+Epoch [200/300] - Loss: 4.8094 (Fuse: 0.4909, Sep: 2.2079, PRM: 2.1106) | LR: 0.000038
+[Validation] Epoch [200/300] - Mean Dice: 0.8198 (WT: 0.8964, TC: 0.8228, ET: 0.7403)
+Epoch [201/300] - Loss: 4.8906 (Fuse: 0.5001, Sep: 2.2516, PRM: 2.1389) | LR: 0.000037
+Epoch [202/300] - Loss: 4.8793 (Fuse: 0.4967, Sep: 2.2481, PRM: 2.1346) | LR: 0.000037
+Epoch [203/300] - Loss: 4.9224 (Fuse: 0.5062, Sep: 2.2558, PRM: 2.1604) | LR: 0.000037
+Epoch [204/300] - Loss: 4.8706 (Fuse: 0.4922, Sep: 2.2590, PRM: 2.1194) | LR: 0.000036
+Epoch [205/300] - Loss: 4.9477 (Fuse: 0.5074, Sep: 2.2716, PRM: 2.1688) | LR: 0.000036
+[Validation] Epoch [205/300] - Mean Dice: 0.8231 (WT: 0.9067, TC: 0.8261, ET: 0.7364)
+Epoch [206/300] - Loss: 4.7479 (Fuse: 0.4824, Sep: 2.1863, PRM: 2.0792) | LR: 0.000036
+Epoch [207/300] - Loss: 4.7813 (Fuse: 0.4823, Sep: 2.2163, PRM: 2.0827) | LR: 0.000035
+Epoch [208/300] - Loss: 4.8057 (Fuse: 0.4938, Sep: 2.2019, PRM: 2.1100) | LR: 0.000035
+Epoch [209/300] - Loss: 4.8139 (Fuse: 0.4883, Sep: 2.2285, PRM: 2.0971) | LR: 0.000035
+Epoch [210/300] - Loss: 4.8604 (Fuse: 0.4952, Sep: 2.2375, PRM: 2.1277) | LR: 0.000034
+[Validation] Epoch [210/300] - Mean Dice: 0.8313 (WT: 0.9076, TC: 0.8271, ET: 0.7591)
+Epoch [211/300] - Loss: 4.9351 (Fuse: 0.5016, Sep: 2.2819, PRM: 2.1516) | LR: 0.000034
+Epoch [212/300] - Loss: 4.8151 (Fuse: 0.4871, Sep: 2.2241, PRM: 2.1038) | LR: 0.000033
+Epoch [213/300] - Loss: 4.7895 (Fuse: 0.4821, Sep: 2.2251, PRM: 2.0823) | LR: 0.000033
+Epoch [214/300] - Loss: 4.8677 (Fuse: 0.4958, Sep: 2.2389, PRM: 2.1330) | LR: 0.000033
+Epoch [215/300] - Loss: 4.8321 (Fuse: 0.4904, Sep: 2.2262, PRM: 2.1155) | LR: 0.000032
+[Validation] Epoch [215/300] - Mean Dice: 0.8404 (WT: 0.9066, TC: 0.8302, ET: 0.7844)
+Epoch [216/300] - Loss: 4.7602 (Fuse: 0.4803, Sep: 2.1975, PRM: 2.0825) | LR: 0.000032
+Epoch [217/300] - Loss: 4.8276 (Fuse: 0.4854, Sep: 2.2391, PRM: 2.1031) | LR: 0.000032
+Epoch [218/300] - Loss: 4.7875 (Fuse: 0.4875, Sep: 2.1922, PRM: 2.1078) | LR: 0.000031
+Epoch [219/300] - Loss: 4.6637 (Fuse: 0.4682, Sep: 2.1562, PRM: 2.0392) | LR: 0.000031
+Epoch [220/300] - Loss: 4.8053 (Fuse: 0.4860, Sep: 2.2133, PRM: 2.1060) | LR: 0.000031
+[Validation] Epoch [220/300] - Mean Dice: 0.8318 (WT: 0.9053, TC: 0.8136, ET: 0.7764)
+Epoch [221/300] - Loss: 4.8215 (Fuse: 0.4833, Sep: 2.2396, PRM: 2.0986) | LR: 0.000030
+Epoch [222/300] - Loss: 4.8770 (Fuse: 0.4966, Sep: 2.2421, PRM: 2.1383) | LR: 0.000030
+Epoch [223/300] - Loss: 4.7667 (Fuse: 0.4829, Sep: 2.1938, PRM: 2.0900) | LR: 0.000030
+Epoch [224/300] - Loss: 4.7306 (Fuse: 0.4792, Sep: 2.1783, PRM: 2.0732) | LR: 0.000029
+Epoch [225/300] - Loss: 4.6976 (Fuse: 0.4749, Sep: 2.1599, PRM: 2.0628) | LR: 0.000029
+[Validation] Epoch [225/300] - Mean Dice: 0.8314 (WT: 0.9062, TC: 0.8247, ET: 0.7633)
+Epoch [226/300] - Loss: 4.7341 (Fuse: 0.4851, Sep: 2.1578, PRM: 2.0911) | LR: 0.000029
+Epoch [227/300] - Loss: 4.7529 (Fuse: 0.4795, Sep: 2.1881, PRM: 2.0852) | LR: 0.000028
+Epoch [228/300] - Loss: 4.6234 (Fuse: 0.4627, Sep: 2.1409, PRM: 2.0198) | LR: 0.000028
+Epoch [229/300] - Loss: 4.7492 (Fuse: 0.4784, Sep: 2.1928, PRM: 2.0780) | LR: 0.000028
+Epoch [230/300] - Loss: 4.7928 (Fuse: 0.4873, Sep: 2.1986, PRM: 2.1069) | LR: 0.000027
+[Validation] Epoch [230/300] - Mean Dice: 0.8163 (WT: 0.9035, TC: 0.8224, ET: 0.7229)
+Epoch [231/300] - Loss: 4.8499 (Fuse: 0.4952, Sep: 2.2204, PRM: 2.1343) | LR: 0.000027
+Epoch [232/300] - Loss: 4.7974 (Fuse: 0.4820, Sep: 2.2114, PRM: 2.1039) | LR: 0.000027
+Epoch [233/300] - Loss: 4.7688 (Fuse: 0.4767, Sep: 2.2152, PRM: 2.0769) | LR: 0.000026
+Epoch [234/300] - Loss: 4.8061 (Fuse: 0.4852, Sep: 2.2127, PRM: 2.1082) | LR: 0.000026
+Epoch [235/300] - Loss: 4.6996 (Fuse: 0.4723, Sep: 2.1646, PRM: 2.0628) | LR: 0.000026
+[Validation] Epoch [235/300] - Mean Dice: 0.8275 (WT: 0.9079, TC: 0.8186, ET: 0.7561)
+Epoch [236/300] - Loss: 4.7619 (Fuse: 0.4827, Sep: 2.1855, PRM: 2.0937) | LR: 0.000025
+Epoch [237/300] - Loss: 4.9123 (Fuse: 0.5020, Sep: 2.2464, PRM: 2.1639) | LR: 0.000025
+Epoch [238/300] - Loss: 4.7857 (Fuse: 0.4829, Sep: 2.2019, PRM: 2.1010) | LR: 0.000025
+Epoch [239/300] - Loss: 4.6798 (Fuse: 0.4710, Sep: 2.1530, PRM: 2.0558) | LR: 0.000024
+Epoch [240/300] - Loss: 4.7976 (Fuse: 0.4841, Sep: 2.2120, PRM: 2.1015) | LR: 0.000024
+[Validation] Epoch [240/300] - Mean Dice: 0.8372 (WT: 0.9111, TC: 0.8331, ET: 0.7673)
+Epoch [241/300] - Loss: 4.6366 (Fuse: 0.4654, Sep: 2.1398, PRM: 2.0314) | LR: 0.000023
+Epoch [242/300] - Loss: 4.7064 (Fuse: 0.4752, Sep: 2.1598, PRM: 2.0715) | LR: 0.000023
+Epoch [243/300] - Loss: 4.6330 (Fuse: 0.4608, Sep: 2.1413, PRM: 2.0309) | LR: 0.000023
+Epoch [244/300] - Loss: 4.7058 (Fuse: 0.4698, Sep: 2.1794, PRM: 2.0566) | LR: 0.000022
+Epoch [245/300] - Loss: 4.8840 (Fuse: 0.4949, Sep: 2.2463, PRM: 2.1429) | LR: 0.000022
+[Validation] Epoch [245/300] - Mean Dice: 0.8333 (WT: 0.9127, TC: 0.8233, ET: 0.7640)
+Epoch [246/300] - Loss: 4.8291 (Fuse: 0.4932, Sep: 2.2039, PRM: 2.1319) | LR: 0.000022
+Epoch [247/300] - Loss: 4.6987 (Fuse: 0.4726, Sep: 2.1601, PRM: 2.0661) | LR: 0.000021
+Epoch [248/300] - Loss: 4.6696 (Fuse: 0.4671, Sep: 2.1566, PRM: 2.0458) | LR: 0.000021
+Epoch [249/300] - Loss: 4.5716 (Fuse: 0.4539, Sep: 2.1194, PRM: 1.9982) | LR: 0.000021
+Epoch [250/300] - Loss: 4.5963 (Fuse: 0.4606, Sep: 2.1102, PRM: 2.0256) | LR: 0.000020
+[Validation] Epoch [250/300] - Mean Dice: 0.8484 (WT: 0.9114, TC: 0.8252, ET: 0.8086)
+Epoch [251/300] - Loss: 4.6753 (Fuse: 0.4671, Sep: 2.1557, PRM: 2.0525) | LR: 0.000020
+Epoch [252/300] - Loss: 4.6663 (Fuse: 0.4627, Sep: 2.1620, PRM: 2.0417) | LR: 0.000020
+Epoch [253/300] - Loss: 4.8642 (Fuse: 0.4942, Sep: 2.2294, PRM: 2.1405) | LR: 0.000019
+Epoch [254/300] - Loss: 4.7161 (Fuse: 0.4765, Sep: 2.1632, PRM: 2.0765) | LR: 0.000019
+Epoch [255/300] - Loss: 4.6146 (Fuse: 0.4623, Sep: 2.1238, PRM: 2.0285) | LR: 0.000018
+[Validation] Epoch [255/300] - Mean Dice: 0.8328 (WT: 0.9062, TC: 0.8217, ET: 0.7704)
+Epoch [256/300] - Loss: 4.6621 (Fuse: 0.4658, Sep: 2.1558, PRM: 2.0406) | LR: 0.000018
+Epoch [257/300] - Loss: 4.6245 (Fuse: 0.4618, Sep: 2.1296, PRM: 2.0331) | LR: 0.000018
+Epoch [258/300] - Loss: 4.7665 (Fuse: 0.4785, Sep: 2.1968, PRM: 2.0913) | LR: 0.000017
+Epoch [259/300] - Loss: 4.7400 (Fuse: 0.4759, Sep: 2.1839, PRM: 2.0801) | LR: 0.000017
+Epoch [260/300] - Loss: 4.6789 (Fuse: 0.4742, Sep: 2.1371, PRM: 2.0676) | LR: 0.000017
+[Validation] Epoch [260/300] - Mean Dice: 0.8316 (WT: 0.9061, TC: 0.8152, ET: 0.7735)
+Epoch [261/300] - Loss: 4.6138 (Fuse: 0.4625, Sep: 2.1226, PRM: 2.0287) | LR: 0.000016
+Epoch [262/300] - Loss: 4.6474 (Fuse: 0.4626, Sep: 2.1527, PRM: 2.0321) | LR: 0.000016
+Epoch [263/300] - Loss: 4.6541 (Fuse: 0.4693, Sep: 2.1293, PRM: 2.0555) | LR: 0.000016
+Epoch [264/300] - Loss: 4.6377 (Fuse: 0.4596, Sep: 2.1507, PRM: 2.0275) | LR: 0.000015
+Epoch [265/300] - Loss: 4.7563 (Fuse: 0.4791, Sep: 2.1872, PRM: 2.0899) | LR: 0.000015
+[Validation] Epoch [265/300] - Mean Dice: 0.8384 (WT: 0.9082, TC: 0.8371, ET: 0.7699)
+Epoch [266/300] - Loss: 4.6535 (Fuse: 0.4663, Sep: 2.1430, PRM: 2.0442) | LR: 0.000014
+Epoch [267/300] - Loss: 4.4930 (Fuse: 0.4417, Sep: 2.0835, PRM: 1.9678) | LR: 0.000014
+Epoch [268/300] - Loss: 4.6353 (Fuse: 0.4635, Sep: 2.1299, PRM: 2.0419) | LR: 0.000014
+Epoch [269/300] - Loss: 4.6793 (Fuse: 0.4721, Sep: 2.1421, PRM: 2.0651) | LR: 0.000013
+Epoch [270/300] - Loss: 4.5587 (Fuse: 0.4530, Sep: 2.1036, PRM: 2.0020) | LR: 0.000013
+[Validation] Epoch [270/300] - Mean Dice: 0.8370 (WT: 0.9079, TC: 0.8359, ET: 0.7673)
+Epoch [271/300] - Loss: 4.5979 (Fuse: 0.4570, Sep: 2.1237, PRM: 2.0172) | LR: 0.000013
+Epoch [272/300] - Loss: 4.6520 (Fuse: 0.4673, Sep: 2.1349, PRM: 2.0497) | LR: 0.000012
+Epoch [273/300] - Loss: 4.6142 (Fuse: 0.4668, Sep: 2.1009, PRM: 2.0465) | LR: 0.000012
+Epoch [274/300] - Loss: 4.6083 (Fuse: 0.4621, Sep: 2.1097, PRM: 2.0366) | LR: 0.000011
+Epoch [275/300] - Loss: 4.5916 (Fuse: 0.4608, Sep: 2.1034, PRM: 2.0275) | LR: 0.000011
+[Validation] Epoch [275/300] - Mean Dice: 0.8515 (WT: 0.9074, TC: 0.8255, ET: 0.8217)
+Epoch [276/300] - Loss: 4.7191 (Fuse: 0.4802, Sep: 2.1493, PRM: 2.0896) | LR: 0.000011
+Epoch [277/300] - Loss: 4.4992 (Fuse: 0.4482, Sep: 2.0618, PRM: 1.9892) | LR: 0.000010
+Epoch [278/300] - Loss: 4.6186 (Fuse: 0.4606, Sep: 2.1237, PRM: 2.0342) | LR: 0.000010
+Epoch [279/300] - Loss: 4.6428 (Fuse: 0.4699, Sep: 2.1200, PRM: 2.0528) | LR: 0.000010
+Epoch [280/300] - Loss: 4.6035 (Fuse: 0.4661, Sep: 2.0968, PRM: 2.0406) | LR: 0.000009
+[Validation] Epoch [280/300] - Mean Dice: 0.8468 (WT: 0.9149, TC: 0.8331, ET: 0.7925)
+Epoch [281/300] - Loss: 4.6587 (Fuse: 0.4707, Sep: 2.1347, PRM: 2.0533) | LR: 0.000009
+Epoch [282/300] - Loss: 4.4851 (Fuse: 0.4439, Sep: 2.0700, PRM: 1.9712) | LR: 0.000008
+Epoch [283/300] - Loss: 4.6803 (Fuse: 0.4709, Sep: 2.1443, PRM: 2.0651) | LR: 0.000008
+Epoch [284/300] - Loss: 4.6109 (Fuse: 0.4639, Sep: 2.1105, PRM: 2.0364) | LR: 0.000008
+Epoch [285/300] - Loss: 4.5912 (Fuse: 0.4634, Sep: 2.0932, PRM: 2.0346) | LR: 0.000007
+[Validation] Epoch [285/300] - Mean Dice: 0.8462 (WT: 0.9063, TC: 0.8277, ET: 0.8047)
+Epoch [286/300] - Loss: 4.6951 (Fuse: 0.4740, Sep: 2.1447, PRM: 2.0765) | LR: 0.000007
+Epoch [287/300] - Loss: 4.6240 (Fuse: 0.4686, Sep: 2.1013, PRM: 2.0541) | LR: 0.000006
+Epoch [288/300] - Loss: 4.6845 (Fuse: 0.4702, Sep: 2.1531, PRM: 2.0612) | LR: 0.000006
+Epoch [289/300] - Loss: 4.6515 (Fuse: 0.4699, Sep: 2.1250, PRM: 2.0566) | LR: 0.000006
+Epoch [290/300] - Loss: 4.6107 (Fuse: 0.4610, Sep: 2.1163, PRM: 2.0334) | LR: 0.000005
+[Validation] Epoch [290/300] - Mean Dice: 0.8426 (WT: 0.9112, TC: 0.8306, ET: 0.7859)
+Epoch [291/300] - Loss: 4.5300 (Fuse: 0.4518, Sep: 2.0866, PRM: 1.9916) | LR: 0.000005
+Epoch [292/300] - Loss: 4.6424 (Fuse: 0.4642, Sep: 2.1341, PRM: 2.0440) | LR: 0.000004
+Epoch [293/300] - Loss: 4.6198 (Fuse: 0.4665, Sep: 2.1073, PRM: 2.0459) | LR: 0.000004
+Epoch [294/300] - Loss: 4.4755 (Fuse: 0.4409, Sep: 2.0669, PRM: 1.9677) | LR: 0.000003
+Epoch [295/300] - Loss: 4.6544 (Fuse: 0.4686, Sep: 2.1270, PRM: 2.0589) | LR: 0.000003
+[Validation] Epoch [295/300] - Mean Dice: 0.8377 (WT: 0.9110, TC: 0.8316, ET: 0.7706)
+Epoch [296/300] - Loss: 4.5803 (Fuse: 0.4593, Sep: 2.0963, PRM: 2.0248) | LR: 0.000003
+Epoch [297/300] - Loss: 4.6272 (Fuse: 0.4635, Sep: 2.1226, PRM: 2.0410) | LR: 0.000002
+Epoch [298/300] - Loss: 4.3695 (Fuse: 0.4313, Sep: 2.0100, PRM: 1.9282) | LR: 0.000002
+Epoch [299/300] - Loss: 4.5467 (Fuse: 0.4550, Sep: 2.0787, PRM: 2.0130) | LR: 0.000001
+Epoch [300/300] - Loss: 4.4600 (Fuse: 0.4459, Sep: 2.0340, PRM: 1.9802) | LR: 0.000001
+[Validation] Epoch [300/300] - Mean Dice: 0.8402 (WT: 0.9136, TC: 0.8338, ET: 0.7731)
